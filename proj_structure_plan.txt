@@ -1,0 +1,70 @@
+Plans for the projects layout:
+
+Project name: test_proj
+Target platform: stm32f4
+
+test_proj
+|
++-- scons_utils
+|    
++-- bsw
+|   |
+|   +-- stm32f4 (git project)
+|   |   |
+|   |   +-- mcal
+|   |   |   |
+|   |   |   +-- dio
+|   |   |   |   
+|   |   |   +-- adc
+|   |   |   |   
+|   |   |   +-- spi
+|   |   |   |   
+|   |   |   +-- common
+|   |   |
+|   |   +-- mcal_if
+|   |   |   |   
+|   |   |   +-- adc_if
+|   |   |   |   
+|   |   |   +-- dio_if
+|   |   |   |   
+|   |   |   +-- spi_if
+|   |   |
+|   |   +-- mcu_os (mcu related specific os files (need compiler define what is the current OS))
+|   |   |
+|   |   +-- os_if (common interface for os functions, like task, mutex, etc. (Need compiler define, to switch what OS is used for the mcu))
+|   |   |
+|   |   +-- tools
+|   |   |   |
+|   |   |   +-- linker
+|   |   |   |
+|   |   |   +-- mcu_flags
+|   |   |   |
+|   |   |   +-- compiler_flags
+|   |   |   |
+|   |   |   +-- mcu dependent stuffs, like, compiler path, flash tool path, flash script, etc
+|   |   |
+|   +-- drivers (git project)
+|   |   |
+|   |   +-- can driver
+|   |   |
+|   |   +-- mem driver
+|   |   |
+|   |   +-- comm driver
+|   |   |
+|   |   +-- eth driver
+|   |   |
+|   |   +-- any complex driver
+|   |   |
+|   |   +-- os_abstrancion (abstraction for complex os functionalities)
+|  
++-- libs 
+|   |
+|   +-- math
+|   |
+|   +-- algoritms, etc
++-- test_proj
+|   |
+|   +-- project application files and modules
+|
++-- out
+
