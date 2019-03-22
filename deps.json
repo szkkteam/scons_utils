@@ -1,0 +1,17 @@
+{
+    "project": "projc_name_test",
+    "dependencies" : [
+        {
+            "project": "driver_fls",
+            "repo": "https://github.com/szkkteam/driver_fls.git",
+            "branch": ""
+            "commit": ""
+        },
+        {
+            "project": "driver_ssd",
+            "repo": "https://github.com/szkkteam/driver_ssd.git",
+            "branch": ""
+            "commit": ""
+        }
+    ]
+}
