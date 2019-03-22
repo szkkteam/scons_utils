@@ -22,6 +22,17 @@ run_scons <Project folder which contains a SconsList.txt file> <Other build opti
    - Build: Driver 3 - As library
    - Build: App - as executable
    
+- Dependencies has to be clarified and maintained by every library. This means, for example, App is know Driver1, Driver2 and Driver3 as dependencies. Driver1 know HAL as dependencies, Driver2 know HAL as dependencies, but the build system has to check that,
+if HAL is already built and the build is up-to date, then there is no need to build it again.
+
+- Dependencies has to be tracked as git repos also. If one dependency is not present, the build system has to clone it, switch to the correct branch/commit then it need to start the build as stated above.
+    for example:
+    deps.json
+
+- run_scons is an alias command. It will wrap the following: $(PYTHON_PATH)/$(PATHON_EXEC) -tt $(SCONS_PATH)/$(SCONS_EXEC) -f $(SCONS_UTILS_PATH)/main.scu --site-dir=$(SCONS_UTILS_PATH) --project_path=
+- running this command will looks like this: run_scons App/ which is actually translated to :
+$(PYTHON_PATH)/$(PATHON_EXEC) -tt $(SCONS_PATH)/$(SCONS_EXEC) -f $(SCONS_UTILS_PATH)/main.scu --site-dir=$(SCONS_UTILS_PATH) --project_path=App/
+   
 
 - git clone bash_repo
 - git clone cmake_utils
