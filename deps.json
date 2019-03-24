@@ -4,13 +4,13 @@
         {
             "project": "driver_fls",
             "repo": "https://github.com/szkkteam/driver_fls.git",
-            "branch": ""
+            "branch": "",
             "commit": ""
         },
         {
             "project": "driver_ssd",
             "repo": "https://github.com/szkkteam/driver_ssd.git",
-            "branch": ""
+            "branch": "",
             "commit": ""
         }
     ]

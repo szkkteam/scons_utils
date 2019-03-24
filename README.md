@@ -29,10 +29,17 @@ if HAL is already built and the build is up-to date, then there is no need to bu
     for example:
     deps.json
 
-- run_scons is an alias command. It will wrap the following: $(PYTHON_PATH)/$(PATHON_EXEC) -tt $(SCONS_PATH)/$(SCONS_EXEC) -f $(SCONS_UTILS_PATH)/main.scu --site-dir=$(SCONS_UTILS_PATH) --project_path=
+- run_scons is an alias command. It will wrap the following: $(PYTHON_PATH)/$(PATHON_EXEC) -tt $(SCONS_UTILS_PATH)/scons.py -f $(SCONS_UTILS_PATH)/main.scu --site-dir=$(SCONS_UTILS_PATH) --project_path=
 - running this command will looks like this: run_scons App/ which is actually translated to :
 $(PYTHON_PATH)/$(PATHON_EXEC) -tt $(SCONS_PATH)/$(SCONS_EXEC) -f $(SCONS_UTILS_PATH)/main.scu --site-dir=$(SCONS_UTILS_PATH) --project_path=App/
    
+
+
+https://www.ostricher.com/2014/09/scons-multi-module-with-build-dir/
+https://bitbucket.org/scons/scons/wiki/MavenIdeasWithSCons
+
+
+https://www.ostricher.com/2014/09/scons-multi-module-with-build-dir/
 
 - git clone bash_repo
 - git clone cmake_utils

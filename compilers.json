@@ -1,0 +1,41 @@
+{
+	"FILE_NAME": "Compiler definitions",
+	"VERSION": "0.1",
+	"DEFAULT" : "gnu",
+	"COMPILERS_LIST" :  [
+	{
+		"COMPILER_NAME": "gnu",
+		"VERSIONS": [ "5.4.0", "x.x.x" ], 
+		"PATH": "",
+		"COMPILER": [
+			{
+				"FRIENDLY_NAME": "GNU C Compiler",
+				"SHORT_NAME": "c",
+				"COMPILER_CMD": "gcc",															
+				"COMPILE_CMD" : "$CC -o $TARGET -c $CFLAGS $CCFLAGS $_CCCOMCOM $SOURCES",		
+				"FLAGS": "",																	
+				"C_SUFFIX": "",																	
+				"O_SUFFIX": "",																	
+			},
+						{
+				"FRIENDLY_NAME": "GNU C++ Compiler",
+				"SHORT_NAME": "c++",
+				"COMPILER_CMD": "g++",															
+				"COMPILE_CMD" : "$CXX -o $TARGET -c $CXXFLAGS $CCFLAGS $_CCCOMCOM $SOURCES",		
+				"FLAGS": "",																		
+				"C_SUFFIX": "",																	
+				"O_SUFFIX": "",																	
+			}
+		],
+		"GENERAL_FLAGS": "",																	
+		"LIB_SUFFIX": "",																		
+		"LIB_PREFIX": "", 																		
+		"LINK_CMD": "$LINK -o $TARGET $LINKFLAGS $__RPATH $SOURCES $_LIBDIRFLAGS $_LIBFLAGS", 	
+		"LINK_FLAGS": "", 																		
+		"ARCHIVER": "",																			
+		"ARCHIVE_CMD": "$AS $ASFLAGS -o $TARGET $SOURCES",										
+		"ARCHIVE_FLAGS": "",
+		"OUTPUT_SUFFIX": "",
+	}
+	]
+}
