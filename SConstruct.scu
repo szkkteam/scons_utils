@@ -1,0 +1,23 @@
+
+
+##
+# The main build script
+#
+##
+import os
+import sys
+import SCons
+
+from enviroment import *
+from options import *
+
+print("Processing using SCons version " + SCons.__version__)
+print('Python '+ sys.version.replace('\n','') + ' on '+sys.platform)
+
+project_version = '0.1.0'
+
+vars = InitializeCommandLineOptions(project_version)
+print ("Project version: ", vars['PROJECT_VERSION'])
+
+# Load common build config
+#SConscript('platforms/platform.sci', must_exist=1)
