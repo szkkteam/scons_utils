@@ -1,0 +1,44 @@
+#!/bin/bash
+
+#
+# Wrapper script for scons
+#
+
+SCONS_VERSION=scons-3.0.4
+POMFILE="pom.scons"
+SCONSTRUCTFILE="`dirname $0`/SConstruct"
+
+usage() {
+	echo "Usage: `basename $0` [-h] [<SCONSOPTS>]"
+	echo "  -h          display this message"
+	echo "  <SCONSOPTS> command line options passed to scons" 
+	echo
+	echo "'`basename $0`' is a wrapper script for 'scons', performing following actions on each call:"
+	echo "  1 Check, whether $POMFILE exists in current directory."
+	echo "    1.1 If $POMFILE does not exist in current directory, exit."
+	echo "    1.2 Else, continue with step 2."
+	echo "  2 Copy $SCONSTRUCTFILE to current directory." 
+	echo "  3 Execute 'scons <SCONSOPTS>'."
+	echo "  4 Delete SConstruct file copied."
+	echo 
+	echo "All command line options, provided to this script, are passed to scons."
+	echo "For more information on command line options supported by scons please refer to '`basename $0` -- -h'."
+	echo "Please note the two hyphends."
+	echo
+}
+
+while getopts "h" opt; do
+	case $opt in
+		h)	usage
+			exit 0	
+			;;
+	esac
+done
+shift $(($OPTIND - 1))
+
+echo "ispscons: Using project object model $POMFILE and SConstruct file $SCONSTRUCTFILE."
+
+
+cp $SCONSTRUCTFILE .
+$PYTHON_EXECUTABLE $SCONS_PATH/$SCONS_EXEC -f $SCONS_UTILS_PATH/$SCONS_MAIN_SCU --site-dir=$SCONS_UTILS_PATH scons $*	
+rm `basename $SCONSTRUCTFILE`

@@ -7,6 +7,7 @@ import sys
 import platform
 import re
 from   SCons.Script import *
+from utils import AppendEnviroment
 
 
 # Map of build host to possible target os
@@ -88,16 +89,57 @@ def GetDefaultEnvironment(help_vars,target_os, target_arch):
             print("using LDFLAGS/LINKFLAGS from environment: %s" % env['LINKFLAGS'])
 
     # set quieter build messages unless verbose mode was requested
-    if not env.get('VERBOSE'):
-        env['CCCOMSTR'] = "Compiling $TARGET"
-        env['SHCCCOMSTR'] = "Compiling $TARGET"
-        env['CXXCOMSTR'] = "Compiling $TARGET"
-        env['SHCXXCOMSTR'] = "Compiling $TARGET"
-        env['LINKCOMSTR'] = "Linking $TARGET"
-        env['SHLINKCOMSTR'] = "Linking shared object $TARGET"
-        env['ARCOMSTR'] = "Archiving $TARGET"
-        env['RANLIBCOMSTR'] = "Indexing Archive $TARGET"
-
+    if env.get('VERBOSE') == 'ON':
+        env['CCCOMSTR'] = "Compiling: $TARGET"
+        env['SHCCCOMSTR'] = "Compiling: $TARGET"
+        env['CXXCOMSTR'] = "Compiling: $TARGET"
+        env['SHCXXCOMSTR'] = "Compiling: $TARGET"
+        env['LINKCOMSTR'] = "Linking: $TARGET"
+        env['SHLINKCOMSTR'] = "Linking shared object: $TARGET"
+        env['ARCOMSTR'] = "Archiving: $TARGET"
+        env['RANLIBCOMSTR'] = "Indexing Archive: $TARGET"
+    elif env.get('VERBOSE') == 'DEBUG':
+        debugCCCOMSTR = '--------Compiling "$TARGET":--------\n'
+        for index, item in enumerate(env['CCCOM'].split()):
+            debugCCCOMSTR += "%2d: %s\n" % (index + 1, item)
+        env['CCCOMSTR'] = debugCCCOMSTR
+        
+        debugSHCCCOMSTR = '--------Compiling "$SOURCES":--------\n'
+        for index, item in enumerate(env['SHCCCOM'].split()):
+            debugSHCCCOMSTR += "%2d: %s\n" % (index + 1, item)
+        env['SHCCCOMSTR'] = debugSHCCCOMSTR
+        
+        debugCXXCOMSTR = '--------Compiling "$SOURCES":--------\n'
+        for index, item in enumerate(env['CXXCOM'].split()):
+            debugCXXCOMSTR += "%2d: %s\n" % (index + 1, item)
+        env['CXXCOMSTR'] = debugCXXCOMSTR
+        
+        debugSHCXXCOMSTR = '--------Compiling "$SOURCES":--------\n'
+        for index, item in enumerate(env['SHCXXCOM'].split()):
+            debugSHCXXCOMSTR += "%2d: %s\n" % (index + 1, item)
+        env['SHCXXCOMSTR'] = debugSHCXXCOMSTR
+        
+        debugLINKCOMSTR = '--------Linking "$TARGET":--------\n'
+        for index, item in enumerate(env['LINKCOM'].split()):
+            debugLINKCOMSTR += "%2d: %s\n" % (index + 1, item)
+        env['LINKCOMSTR'] = debugLINKCOMSTR
+        
+        #TODO: This generate an error
+        #debugSHLINKCOMSTR = '--------Linking "$TARGET":--------\n'
+        #for index, item in enumerate(env['SHLINKCOM'].split()):
+        #    debugSHLINKCOMSTR += "%2d: %s\n" % (index + 1, item)
+        #env['SHLINKCOMSTR'] = debugSHLINKCOMSTR
+        
+        debugARCOMSTR       = '--------Archiving to "$TARGET":--------\n'
+        for index, item in enumerate(env['ARCOM'].split()):
+            debugARCOMSTR += "%2d: %s\n" % (index + 1, item)
+        env['ARCOMSTR']     = debugARCOMSTR
+        
+        debugRANLIBCOMSTR       = '--------Indexing Archive "$TARGET":--------\n'
+        for index, item in enumerate(env['RANLIBCOM'].split()):
+            debugRANLIBCOMSTR += "%2d: %s\n" % (index + 1, item)
+        env['RANLIBCOMSTR']     = debugRANLIBCOMSTR
+        
     tc_set_msg = '''
 ************************************ Warning **********************************
 * Warning: TC_PREFIX and/or TC_PATH is set in the environment.
@@ -128,4 +170,47 @@ def GetDefaultEnvironment(help_vars,target_os, target_arch):
     # Ensure scons is able to change its working directory
     env.SConscriptChdir(1)
 
+    AppendEnviroment(env)
+    
+    print("ARGLIST: ",ARGLIST)
+    print("ARGUMENTS :", ARGUMENTS )
+    
+    print ("env.GetLaunchDir(): ", env.GetLaunchDir())
+    
+    print ("Repository:", Repository())
+    
+    #print (env.Dump())
+    env.SetDir(env.GetLaunchDir())
+    env['ROOT_DIR'] = env.GetLaunchDir() + '/..'
+    
+######################################################################
+# Setting global compiler flags
+######################################################################
+    env.AppendUnique(LIBPATH = [env.get('BUILD_DIR')])
+
+    if not env.get('PREFIX') and not env.get('LIB_INSTALL_DIR'):
+       env.AppendUnique(LIBPATH = [env.get('BUILD_DIR') + '/deploy'])
+
+    if (target_os not in ['windows']):
+        env.AppendUnique(CPPDEFINES=['WITH_POSIX'])
+
+    # Load config of target os
+    env.SConscript('platforms/' + target_os + '/SConscript')
+
+    if env.get('CROSS_COMPILE'):
+        env.Append(RPATH=env.Literal('\\$$ORIGIN'))
+    else:
+        env.Append(RPATH=env.get('BUILD_DIR'))
+
+# Delete the temp files of configuration
+#if env.GetOption('clean'):
+#    dir = env.get('SRC_DIR')
+#
+#    if os.path.exists(dir + '/config.log'):
+#        Execute(Delete(dir + '/config.log'))
+#    if os.path.exists(dir + '/.sconsign.dblite'):
+#        Execute(Delete(dir + '/.sconsign.dblite'))
+#    if os.path.exists(dir + '/.sconf_temp'):
+#        Execute(Delete(dir + '/.sconf_temp'))
+    
     return env

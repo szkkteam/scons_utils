@@ -37,10 +37,11 @@ export SCONS_PATH=$SCONS_UTILS_PATH/$SCONS_VERSION
 # Add the scons main file
 export SCONS_EXEC=scons.py
 
-export SCONS_MAIN_SCU=SConstruct.scu
+export SCONS_MAIN_SCU=SConstruct
 
 # Create the build command alias
-alias run_scons='$PYTHON_EXECUTABLE $SCONS_PATH/$SCONS_EXEC -f $SCONS_UTILS_PATH/$SCONS_MAIN_SCU --site-dir=$SCONS_UTILS_PATH'
+alias run_scons='$PYTHON_EXECUTABLE $SCONS_PATH/$SCONS_EXEC -Y $SCONS_UTILS_PATH --site-dir=$SCONS_UTILS_PATH'
+#alias run_scons=$SCONS_UTILS_PATH/sconswrapper.sh
 
 
 # Export the new path to the system
