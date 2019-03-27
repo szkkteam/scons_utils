@@ -21,6 +21,9 @@ help_vars = InitializeCommandLineOptions(project_version)
 os = GetTargetOs()
 arch = GetTargetArch(os)
 
+# Workaround to don't let scons randomly create this dblite file.
+env.SConsignFile(os.path.join(env.Dir('#').abspath, project_path, '.sconsign.dblite'))
+
 env = GetDefaultEnvironment(help_vars, os, arch)
 
 #print ("CC:", env['CC'])

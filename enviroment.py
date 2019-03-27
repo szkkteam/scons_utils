@@ -51,10 +51,32 @@ def GetDefaultArch(target_os):
 
     return default_arch
 
+def GetTargetOs():
+    host = GetHost()
+    target_os = ARGUMENTS.get('TARGET_OS', host).lower()
+
+    if target_os not in host_target_map[host]:
+        msg = "\nError: host '%s' cannot currently build target '%s'" % (host, target_os)
+        msg += "\n\tchoices: %s\n" % host_target_map[host]
+        Exit(msg)
+
+    return target_os
+
+def GetTargetArch(target_os):
+    target_arch = ARGUMENTS.get('TARGET_ARCH', GetDefaultArch(target_os))  # target arch
+    if target_arch not in os_arch_map[target_os]:
+        msg = "\nError: target os '%s' cannot currently build target '%s'" % (target_os, target_arch)
+        msg += "\n\tchoices: %s\n" % os_arch_map[target_os]
+        Exit(msg)
+
+    return target_arch
+
 ######################################################################
 # this is where the setup of the construction envionment begins
 ######################################################################
-def GetDefaultEnvironment(help_vars,target_os, target_arch):
+def GetDefaultEnvironment(help_vars):
+    target_os = GetTargetOs()
+    target_arch = GetTargetArch(target_os)
     env = Environment(
         variables=help_vars,
         tools=['default', 'textfile'],
@@ -171,14 +193,7 @@ def GetDefaultEnvironment(help_vars,target_os, target_arch):
     env.SConscriptChdir(1)
 
     AppendEnviroment(env)
-    
-    print("ARGLIST: ",ARGLIST)
-    print("ARGUMENTS :", ARGUMENTS )
-    
-    print ("env.GetLaunchDir(): ", env.GetLaunchDir())
-    
-    print ("Repository:", Repository())
-    
+
     #print (env.Dump())
     env.SetDir(env.GetLaunchDir())
     env['ROOT_DIR'] = env.GetLaunchDir() + '/..'
@@ -195,22 +210,22 @@ def GetDefaultEnvironment(help_vars,target_os, target_arch):
         env.AppendUnique(CPPDEFINES=['WITH_POSIX'])
 
     # Load config of target os
-    env.SConscript('platforms/' + target_os + '/SConscript')
+    env.SConscript(GetOption('site_dir') + '/platforms/' + target_os + '/SConscript', must_exist=1, exports = ['env'] )
 
     if env.get('CROSS_COMPILE'):
         env.Append(RPATH=env.Literal('\\$$ORIGIN'))
     else:
         env.Append(RPATH=env.get('BUILD_DIR'))
 
-# Delete the temp files of configuration
-#if env.GetOption('clean'):
-#    dir = env.get('SRC_DIR')
-#
-#    if os.path.exists(dir + '/config.log'):
-#        Execute(Delete(dir + '/config.log'))
-#    if os.path.exists(dir + '/.sconsign.dblite'):
-#        Execute(Delete(dir + '/.sconsign.dblite'))
-#    if os.path.exists(dir + '/.sconf_temp'):
-#        Execute(Delete(dir + '/.sconf_temp'))
+    # Delete the temp files of configuration
+    if env.GetOption('clean'):
+        dir = env.get('SRC_DIR')
+
+        if os.path.exists(dir + '/config.log'):
+            Execute(Delete(dir + '/config.log'))
+        if os.path.exists(dir + '/.sconsign.dblite'):
+            Execute(Delete(dir + '/.sconsign.dblite'))
+        if os.path.exists(dir + '/.sconf_temp'):
+            Execute(Delete(dir + '/.sconf_temp'))
     
     return env

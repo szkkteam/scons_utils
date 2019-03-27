@@ -3,12 +3,13 @@ import sys
 import platform
 import re
 from   SCons.Script import *
+#from enviroment import GetTargetOs, GetTargetArch
 
 ######################################################################
 # Convenience functions to "extend" SCons
 ######################################################################
 
-
+#def set_dir(target_os, target_arch, *args, **kwargs):
 def __set_dir(env, dir):
     #
     # Set the source and build directories
@@ -29,6 +30,9 @@ def __set_dir(env, dir):
 *******************************************************************************
 ''' % dir
         Exit(msg)
+
+    target_os = env['TARGET_OS']
+    target_arch = env['TARGET_ARCH']
 
     build_dir = dir + '/out/' + target_os + '/'
 

@@ -8,31 +8,11 @@ import platform
 import re
 #import SCons.Variables
 from   SCons.Script import *
-from enviroment import *
+from enviroment import GetHost, GetTargetOs, GetTargetArch, GetDefaultArch, host_target_map, os_arch_map, targets_support_cc
 
 ######################################################################
 # Common build options
 ######################################################################
-
-def GetTargetOs():
-    host = GetHost()
-    target_os = ARGUMENTS.get('TARGET_OS', host).lower()
-
-    if target_os not in host_target_map[host]:
-        msg = "\nError: host '%s' cannot currently build target '%s'" % (host, target_os)
-        msg += "\n\tchoices: %s\n" % host_target_map[host]
-        Exit(msg)
-
-    return target_os
-
-def GetTargetArch(target_os):
-    target_arch = ARGUMENTS.get('TARGET_ARCH', GetDefaultArch(target_os))  # target arch
-    if target_arch not in os_arch_map[target_os]:
-        msg = "\nError: target os '%s' cannot currently build target '%s'" % (target_os, target_arch)
-        msg += "\n\tchoices: %s\n" % os_arch_map[target_os]
-        Exit(msg)
-
-    return target_arch
 
 def InitializeCommandLineOptions(project_version):
 
