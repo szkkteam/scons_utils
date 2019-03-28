@@ -255,5 +255,6 @@ if env['CC'] == 'cl':
         env.AppendUnique(UWP_LIBS=['WindowsApp'])
 
 elif env['CC'] == 'gcc':
-    msg = "\nError: gcc not supported on Windows.  Use Visual Studio!\n"
-    Exit(msg)
+    #msg = "\nError: gcc not supported on Windows.  Use Visual Studio!\n"
+    #Exit(msg)
+    pass

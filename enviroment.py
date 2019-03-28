@@ -197,7 +197,7 @@ def GetDefaultEnvironment(help_vars):
     #print (env.Dump())
     env.SetDir(env.GetLaunchDir())
     env['ROOT_DIR'] = env.GetLaunchDir() + '/..'
-    
+
 ######################################################################
 # Setting global compiler flags
 ######################################################################
