@@ -12,60 +12,73 @@ import re
 from options import InitializeCommandLineOptions
 from enviroment import GetTargetOs, GetTargetArch, GetDefaultEnvironment
 
-def get_targets(env, *args, **kwargs):
-    """Return list of target nodes for given target name queries.
-    Every positional argument is a singe query.
-    Supported query formats:
-    1. Fully-Qualified "Module::Target" name queries.
-       Matches exact target entries.
-    2. Target-name-only queries (no "::" in query).
-       Matches all targets with that name, potentially from multiple modules.
-       In case of multi-module matches, a warning will be printed.
-    3. Wildcard queries (containing "*" in the query).
-       Matches all targets whose fully-qualified Module::Target name
-       matches the wildcard expression.
-       No warning is printed for multiple matches.
-    Optionally, pass a keyword argument "no_multi_warn=True" to suppress
-    warning messages for unexpected multiple matches for a query.
-    Warning messages are always printed when a query results zero matches.
-    """
-    no_multi_warn = kwargs.pop('no_multi_warn', False)
-    def query_to_regex(query):
-        """Return RegEx for specified query `query`."""
-        # Escape query string
-        query = re.escape(query)
-        if r'\*' in query:  # '\' because of RE escaping
-            # It's a wildcard query
-            return re.compile('^%s$' % (query.replace('\\*', '.*'))), False
-        if r'\:\:' in query:  # '\' because of RE escaping
-            # It's a fully-qualified "Module::Target" query
-            return re.compile('^%s$' % (query)), True
-        # else - it's a target-name-only query
-        return re.compile(r'^[^\:]*\:{2}%s$' % (query)), True
-    target_names = set(env['targets'].keys())
-    matching_target_names = list()
-    for query in args:
-        # Remove matched target names to avoid scanning them again
-        target_names = target_names.difference(matching_target_names)
-        qre, warn = query_to_regex(query)
-        match_count = 0
-        for target_name in target_names:
-            if qre.match(target_name):
-                matching_target_names.append(target_name)
-                match_count += 1
-        # Warn about unexpected scenarios
-        if 0 == match_count:
-            # No matches for query probably means typo in query
-            print ('scons: warning: get_targets query "%s" had no matches' %
-                   (query))
-        elif warn and (not no_multi_warn) and (1 < match_count):
-            # Multiple matches for a "warnable" query might indicate
-            #  a too-broad query.
-            print ('scons: warning: get_targets query "%s" had %d matches' %
-                   (query, match_count))
-    # Aggregate all matching target lists and return a single list of targets
-    return reduce(lambda acculist, tname: acculist + env['targets'][tname],
-    matching_target_names, [])
+def intersection(*args):
+    """Return the intersection of all iterables passed."""
+    args = list(args)
+    result = set(listify(args.pop(0)))
+    while args and result:
+        # Finish the loop either when args is consumed, or result is empty
+        result.intersection_update(listify(args.pop(0)))
+    return result
+
+def nop(*args, **kwargs):  # pylint: disable=unused-argument
+    """Take arbitrary args and kwargs and do absolutely nothing!"""
+    pass
+
+BASE_TARGET_ENV_EXTENSIONS = {
+    'debug': dict(
+        # Extra flags for debug builds
+    ),
+    'release': dict(
+        # Extra flags for release builds
+    ),
+}
+
+def targets(target_list):
+    if target_list:
+        target_lists = set(BASE_TARGET_ENV_EXTENSIONS.keys() + target_list.keys())
+    else:
+        target_lists = set(BASE_TARGET_ENV_EXTENSIONS.keys())
+    for target in target_lists:
+        # Skip "hidden" records
+        yield flavor
+
+class Builder(object):
+    def __init__(self, target, target_list=None):
+        # Get the command line variables
+        help_vars = InitializeCommandLineOptions(project_version)
+        # Initialize shared libraries dictionary
+        self._shared_libs = dict()
+        # Get the default enviroment
+        self._def_env = GetDefaultEnvironment(help_vars)
+        # Get the command line target
+        self._getCommandLineTarget(target_list)
+        # Set the selected target
+        if target_list:
+            self._target_list = set(BASE_TARGET_ENV_EXTENSIONS.keys() + target_list.keys())
+        else:
+            self._target_list = set(BASE_TARGET_ENV_EXTENSIONS.keys())
+        # Apply target env customizations
+        if target in self._target_list:
+            self._env.Append(**self._target_list[target])
+        # Support using the flavor name as target name for its related targets
+        #TODO: Check buildroot? Or use env['BUILD_DIR']
+        self._env.Alias(flavor, '$BUILDROOT')
+
+    def _getCommandLineTarget(self, target_list):
+        # If a target is activated in the external environment - use it
+        if 'BUILD_TARGET' in os.environ:
+            active_target = os.environ['BUILD_TARGET']
+            if not active_target in targets(target_list):
+                msg = "\nError: %s (from env) is not a known target." % (active_target)
+                Exit(msg)
+            print ('scons: Using active target "%s" from your environment' % (active_target))
+            self._env.activeTargets = [active_target]
+        else:
+            # If specific flavor target specified, skip processing other flavors
+            # Otherwise, include all known flavors
+            self._env.activeTargets = (set(targets(target_list)).intersection(COMMAND_LINE_TARGETS)  # pylint: disable=undefined-variable
+                           or targets(target_list))
 
 def modules():
     """Generate modules to build.
@@ -88,6 +101,8 @@ help_vars = InitializeCommandLineOptions(project_version)
 #env.SConsignFile(os.path.join(env.Dir('#').abspath, project_path, '.sconsign.dblite'))
 
 env = GetDefaultEnvironment(help_vars)
+
+
 
 build_dir = env['BUILD_DIR']
 

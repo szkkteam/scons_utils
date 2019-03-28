@@ -38,6 +38,7 @@ $(PYTHON_PATH)/$(PATHON_EXEC) -tt $(SCONS_PATH)/$(SCONS_EXEC) -f $(SCONS_UTILS_P
 https://www.ostricher.com/2014/09/scons-multi-module-with-build-dir/
 https://bitbucket.org/scons/scons/wiki/MavenIdeasWithSCons
 
+https://chromium.googlesource.com/native_client/src/native_client/+/202ccbd707ded4002aa402b9da0ea4e4026f3a1d/SConstruct
 
 https://www.ostricher.com/2014/09/scons-multi-module-with-build-dir/
 

@@ -201,21 +201,21 @@ def GetDefaultEnvironment(help_vars):
 ######################################################################
 # Setting global compiler flags
 ######################################################################
-    env.AppendUnique(LIBPATH = [env.get('BUILD_DIR')])
-
-    if not env.get('PREFIX') and not env.get('LIB_INSTALL_DIR'):
-       env.AppendUnique(LIBPATH = [env.get('BUILD_DIR') + '/deploy'])
-
-    if (target_os not in ['windows']):
-        env.AppendUnique(CPPDEFINES=['WITH_POSIX'])
+    # TODO: Are they really needed?
+    #env.AppendUnique(LIBPATH = [env.get('BUILD_DIR')])
+    #if not env.get('PREFIX') and not env.get('LIB_INSTALL_DIR'):
+       #env.AppendUnique(LIBPATH = [env.get('BUILD_DIR') + '/deploy'])
+    #if (target_os not in ['windows']):
+        #env.AppendUnique(CPPDEFINES=['WITH_POSIX'])
 
     # Load config of target os
-    env.SConscript(GetOption('site_dir') + '/platforms/' + target_os + '/SConscript', must_exist=1, exports = ['env'] )
+    #env.SConscript(GetOption('site_dir') + '/platforms/' + target_os + '/SConscript', must_exist=1, exports = ['env'] )
 
-    if env.get('CROSS_COMPILE'):
-        env.Append(RPATH=env.Literal('\\$$ORIGIN'))
-    else:
-        env.Append(RPATH=env.get('BUILD_DIR'))
+    # TODO: search for RPATH and ORIGIN, this is probably needed, but not here.
+    #if env.get('CROSS_COMPILE'):
+        #env.Append(RPATH=env.Literal('\\$$ORIGIN'))
+    #else:
+        #env.Append(RPATH=env.get('BUILD_DIR'))
 
     # Delete the temp files of configuration
     if env.GetOption('clean'):
@@ -229,3 +229,11 @@ def GetDefaultEnvironment(help_vars):
             Execute(Delete(dir + '/.sconf_temp'))
     
     return env
+
+def GetGetPlatformConfig(env):
+    # Load config of target os
+    env.SConscript(GetOption('site_dir') + '/platforms/' + target_os + '/SConscript', must_exist=1, exports=['env'])
+
+def SetBuildDirectory(env, dir, target):
+    env.SetDir(env.GetLaunchDir())
+    env['ROOT_DIR'] = env.GetLaunchDir() + '/..'
