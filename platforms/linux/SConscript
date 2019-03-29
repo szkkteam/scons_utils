@@ -10,9 +10,9 @@ from distutils.version import LooseVersion
 Import('env')
 
 # Add the default lib directory
-build_dir = env.get('BUILD_DIR')
-env.AppendUnique(LIBPATH=[build_dir])
-env.AppendENVPath('LD_LIBRARY_PATH', [build_dir])
+#build_dir = env.get('BUILD_DIR')
+#env.AppendUnique(LIBPATH=[build_dir])
+#env.AppendENVPath('LD_LIBRARY_PATH', [build_dir])
 
 # Set release/debug flags
 if env.get('RELEASE'):
@@ -25,11 +25,11 @@ if not env.get('RELEASE') and env.get('COVERAGE_CHECKS'):
     env.AppendUnique(CCFLAGS=['--coverage', '-fPIC', '-O0'])
     env.AppendUnique(LINKFLAGS=['--coverage'])
 
-env.AppendUnique(CPPDEFINES=['WITH_POSIX', '__linux__'])
+#env.AppendUnique(CPPDEFINES=['WITH_POSIX', '__linux__'])
 env.AppendUnique(CFLAGS=['-std=gnu99'])
 env.AppendUnique(CCFLAGS=['-Wall', '-Wextra', '-fPIC'])
 env.AppendUnique(SHLINKFLAGS=['-Wl,--as-needed'])
-env.AppendUnique(LIBS=['dl', 'pthread', 'uuid'])
+#env.AppendUnique(LIBS=['dl', 'pthread', 'uuid'])
 
 # The -Wno-error=missing-field-initializers is used due to a bug in versions
 # of gcc older than 5.0 see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=36750

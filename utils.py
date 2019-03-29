@@ -9,7 +9,6 @@ from   SCons.Script import *
 # Convenience functions to "extend" SCons
 ######################################################################
 
-#def set_dir(target_os, target_arch, *args, **kwargs):
 def __set_dir(env, dir):
     #
     # Set the source and build directories
@@ -33,20 +32,36 @@ def __set_dir(env, dir):
 
     target_os = env['TARGET_OS']
     target_arch = env['TARGET_ARCH']
+    variant = env['VARIANT']
 
-    build_dir = dir + '/out/' + '/%s/' + target_os + '/' + target_arch
+    # Create base out directory path.
+    # project_root/out/<target_os>/<target_arch>/<install or bin>/
+    build_dir = dir + '/out/%s_%s/%s/' % (target_os, target_arch, variant) + '%s/'
+    # Create variant directory. Variants in default are: <release, debug> but other variants can be specified also
+    # Create a binary directory
+    # project_root/out/<target_os>/<target_arch>/bin/
+    bin_dir = build_dir % 'bin'
+    # Create a static/shared library directory
+    # project_root/out/<target_os>/<target_arch>/install/<variant>
+    lib_dir = build_dir % 'install'
+    # Create an include directory
+    # project_root/out/<target_os>/<target_arch>/install/include/
+    #inc_dir = (build_dir + '/include/') % 'install'
+    inc_dir = (build_dir) % 'install'
+    # Create an object directory
+    # project_root/out/<target_os>/<target_arch>/bin/obj/
+    obj_dir = (build_dir + '/obj/') % 'bin'
 
-    if env.get('RELEASE'):
-        build_dir = build_dir + '/release/'
-    else:
-        build_dir = build_dir + '/debug/'
+    #env.VariantDir((variant_dir % 'bin'), dir, duplicate=0)
 
-    env.VariantDir((build_dir % 'bin'), dir, duplicate=0)
-
-    env.Replace(BUILD_DIR=(build_dir % 'bin'))
+    env.Replace(BUILD_DIR=(bin_dir))
     env.Replace(SRC_DIR=dir)
-    env.Replace(INSTALL_DIR=(build_dir % 'install'))
-    env.Replace(LIBPATH=(build_dir % 'install'))
+    env.Replace(INC_DIR=(inc_dir))
+    env.Replace(LIB_PATH=(lib_dir))
+    env.Replace(OBJ_PATH=(obj_dir))
+
+
+    env.Replace(CPPPATH=inc_dir)
 
 
 def __src_to_obj(env, src, home=''):
