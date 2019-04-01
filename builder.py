@@ -33,6 +33,7 @@ def path_to_key(path):
     """Convert path to `key`, by replacing pathseps with periods."""
     return path.replace('/', '.').replace('\\', '.')
 
+
 class Builder(object):
 
     class TargetBuilder(object):
@@ -67,6 +68,8 @@ class Builder(object):
             self._env.ApplyVariant(target)
 
             self._target = target
+
+
 
         ##
         # Creates a path out of given elements, which are substituted if needed.
@@ -122,6 +125,35 @@ class Builder(object):
         def env(self):
             return self._env._env
 
+        def createAlias(self, name, node):
+            self._target_nodes[name].extend(node)
+
+        def first_pass_dict(self, module):
+            _default_shortcuts = dict(
+                CreateDefaultTargetLib=lambda name=module, version='0.1', sources=list(), headers=list(), *args,
+                **kwargs: self._build_alias_lib(
+                    module, name, module, version, sources, headers, *args, **kwargs),
+                CreateTargetLib=lambda target=self._target, name=module, version='0.1', sources=list(), headers=list(),
+                *args, **kwargs: self._build_alias_lib(
+                    target, name, module, version, sources, headers, *args, **kwargs),
+                CreateDefaultTargetExecutable=nop,
+                CreateTargetExecutable=nop
+            )
+            return _default_shortcuts
+
+        def second_pass_dict(self, module):
+            _default_shortcuts = dict(
+                CreateDefaultTargetLib=nop,
+                CreateTargetLib=nop,
+                CreateDefaultTargetExecutable=lambda name=module, version='0.1', sources=list(), headers=list(),
+                libs=list(), *args, **kwargs: self._build_alias_executable(
+                    self._target, name, module, version, sources, libs, *args, **kwargs),
+                CreateTargetExecutable=lambda target=self._target, name=module, version='0.1', sources=list(),
+                headers=list(), libs=list(), *args, **kwargs: self._build_alias_executable(
+                    target, name, module, version, sources, libs, *args, **kwargs)
+            )
+            return _default_shortcuts
+
         def Build(self):
             """Build flavor using two-pass strategy."""
             # First pass over all modules - process and collect library targets
@@ -132,36 +164,25 @@ class Builder(object):
                     msg = "\nMissing SConscript file for module %s." % (module)
                     Exit(msg)
                 print ("scons: |- First pass: Reading module %s ..." % (module))
-                shortcuts = dict(
-                    CreateDefaultTargetLib       = lambda lib_name, module_version, sources, headers, *args, **kwargs: self._build_alias_lib(module, lib_name, module, module_version, sources, headers, *args, **kwargs),
-                    CreateTargetLib              = lambda alias, lib_name, module_version, sources, headers, *args, **kwargs: self._build_alias_lib(alias, lib_name, module, module_version, sources, headers, *args, **kwargs),
-                    #StaticLib = self._lib_wrapper(self.env.StaticLibrary, module),
-                    #SharedLib = self._lib_wrapper(self.env.SharedLibrary, module),
-                    CreateDefaultTargetExecutable      =  nop,
-                )
+                # Workaround to do not let the system to start app build, until the libs are not scanned.
                 self.env.SConscript(
                     sconscript_path,
                     variant_dir=os.path.join(self.env['LIB_PATH'], module),
-                    #variant_dir=self.env['LIBPATH'],
-                    must_exist = 1,
-                    duplicate=0,
-                    exports=shortcuts)
-            # Second pass over all modules - process program targets
-            shortcuts = dict()
-            for nop_shortcut in ('CreateDefaultTargetLib', 'CreateTargetLib', 'StaticLib', 'SharedLib'):
-                shortcuts[nop_shortcut] = nop
-            for module in modules():
-                print("scons: |- Second pass: Reading module %s ..." % (module))
-                shortcuts['CreateDefaultTargetExecutable'] = lambda prog_name, prog_version, sources, link_libs, *args, **kwargs: self._build_alias_executable(module, prog_name, module, prog_version, sources, link_libs,
-                                            *args, **kwargs)
-
-                self.env.SConscript(
-                    os.path.join(module, 'SConscript'),
-                    variant_dir = os.path.join(self.env['BUILD_DIR'], module),
                     must_exist=1,
                     duplicate=0,
-                    exports = shortcuts)
+                    exports=self.first_pass_dict(module))
+            # Second pass over all modules - process program targets
+            # Workaround to do not let the system to build the libs twice
+            for module in modules():
+                print("scons: |- Second pass: Reading module %s ..." % (module))
+                self.env.SConscript(
+                    os.path.join(module, 'SConscript'),
+                    variant_dir=os.path.join(self.env['BUILD_DIR'], module),
+                    must_exist=1,
+                    duplicate=0,
+                    exports=self.second_pass_dict(module))
 
+            # Create aliases for each node
             for alias, nodes in self._target_nodes.items():
                 for node in nodes:
                     #print("Target: %s - Alias: %s - Node: %s" % (self._target, alias, node))
@@ -175,49 +196,50 @@ class Builder(object):
             # Store resulting library node in shared dictionary
             # self._shared_libs[lib_key] = bldr_func(lib_name, sources, *args, **kwargs)
             obj_targets = self._build_default_objects(module_name, sources)
-
-            lib_node = self.env.Library(target=lib_name,
-                                 source=obj_targets,
-                                 *args, **kwargs)
-
+            # Create a lib node.
+            lib_node = self.env.Library(target=lib_name, source=obj_targets, *args, **kwargs)
+            # Store the library key in shared libs list
             self._shared_libs[lib_key] = lib_node
-
+            # Create an alias target for the lib
+            self.createAlias(alias, lib_node)
             # Make sure headers are list
             headers = listify(headers)
-
-            # Get the isntall directory for the active variant
-            inc_path = self.env['INC_DIR'] + '/'
-
-            # Install every header file to the shared <INC_DIR> keep the folder hierarchy for the header files
-            inc_node = [self.env.Install(self.createNode([os.path.split(inc_path + h)[0]]), h) for h in headers]
-
-            self._target_nodes[alias].extend(inc_node)
-            self._target_nodes[alias].extend(lib_node)
-            self._target_nodes['install'].extend(inc_node)
-
-            # TODO: collect the output into aliases and register them at the end as: "install"
-
+            if len(headers) > 0:
+                # Remove redundant elements
+                headers = remove_redundant(headers)
+                # Get the isntall directory for the active variant
+                inc_path = self.env['INC_DIR'] + '/'
+                # Install every header file to the shared <INC_DIR> keep the folder hierarchy for the header files
+                inc_node = [self.env.Install(self.createNode([os.path.split(inc_path + h)[0]]), h) for h in headers]
+                # Create alias targets for the header nodes
+                self.createAlias(alias, lib_node)
+                self.createAlias('install', inc_node)
 
         def _build_default_objects(self, module, sources):
+            # Make sure headers are list
+            sources = listify(sources)
+            # Remove redundant elements
             sources = remove_redundant(sources)
-            obj_path = self.env['OBJ_PATH'] + '/' + module + '/'
-            # TODO: Object files maybe should placed into $OBJ_DIR/module/path/src.o. Now it will be just placed to: $OBJ_DIR/module/src.o
-            # This version will be a problem, if the same src file name exists within the module.
-            #obj_targets = [ self.env.Object(target = obj_path + os.path.splitext(os.path.basename(item))[0], source = item) for item in sources]
-            #self.env.Alias(module, obj_targets)
-
             obj_targets = []
-            for item in sources:
-                # '#' sign here is mandatory, otherwise the include path is wrong
-                # TODO: Why this is not working without the '#' sign?
-                inc_dir = [self.createNode(['#' + module])] + [self.createNode([self.env['CPPPATH']])]
-                base_item = os.path.splitext(os.path.basename(item))[0]  # strip relative path part and extension
-                obj_node = self.env.Object(target = obj_path + base_item,
-                                           source = item,
-                                           CPPPATH=inc_dir)
-                obj_targets.append(obj_node)
-                self.env.Alias(module + '/' + item, obj_node)
-
+            if len(sources) > 0:
+                obj_path = self.env['OBJ_PATH'] + '/' + module + '/'
+                # TODO: Object files maybe should placed into $OBJ_DIR/module/path/src.o. Now it will be just placed to: $OBJ_DIR/module/src.o
+                for item in sources:
+                    # '#' sign here is mandatory, otherwise the include path is wrong
+                    # TODO: Why this is not working without the '#' sign?
+                    # Create a node from the include directory
+                    inc_dir = [self.createNode(['#' + module])] + [self.createNode([self.env['CPPPATH']])]
+                    # Get the base fileanem from the hive source
+                    base_item = os.path.splitext(os.path.basename(item))[0]  # strip relative path part and extension
+                    # TODO: Cannot create nodes from item,s Why?
+                    obj_node = self.env.Object(
+                                    target=obj_path + base_item,
+                                    source=item,
+                                    CPPPATH=inc_dir)
+                    # Append the object node to targets
+                    obj_targets.append(obj_node)
+                    # Create an alias target from object node
+                    self.createAlias(module + '/' + item, obj_node)
             return obj_targets
 
         def _build_alias_executable(self, alias, prog_name, module_name, prog_version, sources, link_libs, *args, **kwargs):
@@ -240,6 +262,9 @@ class Builder(object):
             exec_path = self.env['BUILD_DIR'] + '/'
             obj_nodes = (self._build_default_objects(module_name, sources))
             prog_nodes = self.env.Program(exec_path + prog_name, obj_nodes, LIBS=lib_nodes, *args, **kwargs)
+            # Create an alias target for the lib
+            #if self._target in BUILD_TARGETS:
+            self.createAlias(alias, prog_nodes)
 
 
             #obj_targets = self._build_default_objects(module_name, sources)

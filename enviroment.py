@@ -195,10 +195,10 @@ class QEnvironment(object):
             self.env.SetDir(self.env.GetLaunchDir())
 
             # If the variant target is still present in the build targets, add as an alias
-            if variant in BUILD_TARGETS:
+            #if variant in BUILD_TARGETS:
                 # Create an alias for the target
                 # TODO: This shall be placed to builder.py where the prog is built.
-                self.env.Alias(variant, self.env['BUILD_DIR'])
+                #self.env.Alias(variant, self.env['BUILD_DIR'])
 
         else:
             msg = "\nError: variant '%s' not specified." % (variant)
