@@ -130,8 +130,6 @@ class QEnvironment(object):
             if len(intersect_targets) > 0 and (len(BUILD_TARGETS) > len(intersect_targets)):
                 [BUILD_TARGETS.remove(target) for target in intersect_targets]
 
-
-
     @property
     def targets(self):
         return self._active_variants

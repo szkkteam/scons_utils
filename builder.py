@@ -137,7 +137,7 @@ class Builder(object):
                     CreateTargetLib              = lambda alias, lib_name, module_version, sources, headers, *args, **kwargs: self._build_alias_lib(alias, lib_name, module, module_version, sources, headers, *args, **kwargs),
                     #StaticLib = self._lib_wrapper(self.env.StaticLibrary, module),
                     #SharedLib = self._lib_wrapper(self.env.SharedLibrary, module),
-                    Prog      =  nop,
+                    CreateDefaultTargetExecutable      =  nop,
                 )
                 self.env.SConscript(
                     sconscript_path,
@@ -146,26 +146,26 @@ class Builder(object):
                     must_exist = 1,
                     duplicate=0,
                     exports=shortcuts)
-                # Second pass over all modules - process program targets
-                shortcuts = dict()
-                for nop_shortcut in ('CreateDefaultTargetLib', 'CreateTargetLib', 'StaticLib', 'SharedLib'):
-                    shortcuts[nop_shortcut] = nop
-                for module in modules():
-                    print("scons: |- Second pass: Reading module %s ..." % (module))
-                    shortcuts['CreateDefaultTargetExecutable'] = lambda prog_name, prog_version, sources, link_libs, *args, **kwargs: self._build_alias_executable(module, prog_name, module, prog_version, sources, link_libs,
-                                                *args, **kwargs)
+            # Second pass over all modules - process program targets
+            shortcuts = dict()
+            for nop_shortcut in ('CreateDefaultTargetLib', 'CreateTargetLib', 'StaticLib', 'SharedLib'):
+                shortcuts[nop_shortcut] = nop
+            for module in modules():
+                print("scons: |- Second pass: Reading module %s ..." % (module))
+                shortcuts['CreateDefaultTargetExecutable'] = lambda prog_name, prog_version, sources, link_libs, *args, **kwargs: self._build_alias_executable(module, prog_name, module, prog_version, sources, link_libs,
+                                            *args, **kwargs)
 
-                    self.env.SConscript(
-                        os.path.join(module, 'SConscript'),
-                        variant_dir = os.path.join(self.env['BUILD_DIR'], module),
-                        must_exist=1,
-                        duplicate=0,
-                        exports = shortcuts)
+                self.env.SConscript(
+                    os.path.join(module, 'SConscript'),
+                    variant_dir = os.path.join(self.env['BUILD_DIR'], module),
+                    must_exist=1,
+                    duplicate=0,
+                    exports = shortcuts)
 
-                for alias, nodes in self._target_nodes.items():
-                    for node in nodes:
-                        #print("Target: %s - Alias: %s - Node: %s" % (self._target, alias, node))
-                        self.env.Alias(alias, node)
+            for alias, nodes in self._target_nodes.items():
+                for node in nodes:
+                    #print("Target: %s - Alias: %s - Node: %s" % (self._target, alias, node))
+                    self.env.Alias(alias, node)
 
         def _build_alias_lib(self, alias, lib_name, module_name, module_version,  sources, headers, *args, **kwargs):
             # Create unique library key from module and library name
@@ -175,6 +175,7 @@ class Builder(object):
             # Store resulting library node in shared dictionary
             # self._shared_libs[lib_key] = bldr_func(lib_name, sources, *args, **kwargs)
             obj_targets = self._build_default_objects(module_name, sources)
+
             lib_node = self.env.Library(target=lib_name,
                                  source=obj_targets,
                                  *args, **kwargs)
@@ -220,13 +221,14 @@ class Builder(object):
             return obj_targets
 
         def _build_alias_executable(self, alias, prog_name, module_name, prog_version, sources, link_libs, *args, **kwargs):
+            lib_nodes = []
             for lib_name in listify(link_libs):
                 lib_keys = listify(self._get_matching_lib_keys(lib_name))
                 if len(lib_keys) == 1:
                     # Matched internal library
                     lib_key = lib_keys[0]
                     # Extend prog sources with library nodes
-                    sources.extend(self._shared_libs[lib_key])
+                    lib_nodes.extend(self._shared_libs[lib_key])
                 elif len(lib_keys) > 1:
                     # Matched multiple internal libraries - probably bad!
                     msg = "Library identifier \'%s\' matched %d libraries (%s). Please use a fully qualified identifier instead!" % (lib_name, len(lib_keys), ', '.join(lib_keys))
@@ -235,7 +237,9 @@ class Builder(object):
 
                     msg = "Library identifier \'%s\' didn\'t match any library. Is it a typo?" % (lib_name)
                     Exit(msg)
-                prog_nodes = self.env.Program(prog_name, sources, *args, **kwargs)
+            exec_path = self.env['BUILD_DIR'] + '/'
+            obj_nodes = (self._build_default_objects(module_name, sources))
+            prog_nodes = self.env.Program(exec_path + prog_name, obj_nodes, LIBS=lib_nodes, *args, **kwargs)
 
 
             #obj_targets = self._build_default_objects(module_name, sources)
