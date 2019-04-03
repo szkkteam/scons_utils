@@ -1,0 +1,37 @@
+# Default configuration for the Scons Build system.
+---
+user_variants:
+  debug:
+    env_override:
+    - CPPATH: "/mnt/"
+    - CPPATH: "/mnt/"
+    env_extension:
+    - CPPATH: "/mnt/"
+    - CPPATH: "/mnt/"
+  release:
+    env_override:
+    - CPPATH: "/mnt/"
+    - CPPATH: "/mnt/"
+    env_extension:
+    - CPPATH: "/mnt/"
+    - CPPATH: "/mnt/"
+default_variants:
+- debug
+- release
+platforms:
+- OS: 
+  ARCH: 
+  config: "/config"
+- OS: 
+  ARCH: 
+  config: "/config"
+automatic_module_discovery:
+  enable: true
+  scan_depth: 7
+  skip_patterns:
+  - ".no_recurse"
+modules_list:
+- driver
+- driver2
+- app
+- example

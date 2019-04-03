@@ -14,6 +14,8 @@ from enviroment import QEnvironment, listify, remove_redundant
 
 print("Processing using SCons version " + SCons.__version__)
 print('Python '+ sys.version.replace('\n','') + ' on '+sys.platform)
+#TODO: Enable this when neccessery to force the version
+#assert sys.version_info >= (3, 5)
 
 def modules():
     """Generate modules to build.
@@ -24,6 +26,7 @@ def modules():
     yield 'driver2'
     yield 'driver'
     yield 'app'
+    yield 'example'
 
 def nop(*args, **kwargs):  # pylint: disable=unused-argument
     """Take arbitrary args and kwargs and do absolutely nothing!"""
@@ -32,7 +35,6 @@ def nop(*args, **kwargs):  # pylint: disable=unused-argument
 def path_to_key(path):
     """Convert path to `key`, by replacing pathseps with periods."""
     return path.replace('/', '.').replace('\\', '.')
-
 
 class Builder(object):
 
@@ -212,7 +214,7 @@ class Builder(object):
                 # Install every header file to the shared <INC_DIR> keep the folder hierarchy for the header files
                 inc_node = [self.env.Install(self.createNode([os.path.split(inc_path + h)[0]]), h) for h in headers]
                 # Create alias targets for the header nodes
-                self.createAlias(alias, lib_node)
+                self.createAlias(alias, inc_node)
                 self.createAlias('install', inc_node)
 
         def _build_default_objects(self, module, sources):

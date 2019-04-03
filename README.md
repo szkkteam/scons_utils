@@ -32,7 +32,31 @@ if HAL is already built and the build is up-to date, then there is no need to bu
 - run_scons is an alias command. It will wrap the following: $(PYTHON_PATH)/$(PATHON_EXEC) -tt $(SCONS_UTILS_PATH)/scons.py -f $(SCONS_UTILS_PATH)/main.scu --site-dir=$(SCONS_UTILS_PATH) --project_path=
 - running this command will looks like this: run_scons App/ which is actually translated to :
 $(PYTHON_PATH)/$(PATHON_EXEC) -tt $(SCONS_PATH)/$(SCONS_EXEC) -f $(SCONS_UTILS_PATH)/main.scu --site-dir=$(SCONS_UTILS_PATH) --project_path=App/
+
+
    
+TODO:
+- YAML config file in project root. It will override the default yaml stored in the scons utils. In the YAML the following things can be configured:
+- Default variants: [debug/release/etc...] When a default target lib or exec used in a modul script, all of them will be built when the default target is selected.
+- User variants. [test/example/etc...] All of this items will be added to the variants lists. If they are also present in the default section, the default variants options will be true. Overrides and extensions will present here also.
+- Cross compile target config. A filename with relative path is defined here. Also OS+ARCH tags. The user can specify the OS and ARCH parameters during build, and the defined target will be added to the list. If the selected OS and ARCH is the same as the defined,
+    the linked SconScript file will be used to set up the system.
+- Automatic module discovery. If it's selected/defined, the system will scan the folders to determine the modules. A Max depth, and skip files can be defined here.
+- List of modules. If the automatic module discovery is not defined, the list of modules will tell the system which modules shall be scanned for sconscript file. The order of modules will be top down.
+
+build phases:
+- ??? Preprocess
+- #0 - Scan modules, read sconscipt, process the following functions: [Set(), ... ]
+- #1 - Go through on the listed modules, build libraries, install headers, process the following functions: [Get(), CreateDefaultTargetLib(), CreateTargetLib(), ... ]
+- #2 - Go through on the listed modules, build executables and link them. process the following functions: [Get(), CreateDefaultTargetExecutable(), CreateTargetExecutable(), ... ]
+- ??? Postprocess 
+
+- Automatic module discovery
+- Set(DEFINE_NAME, value) -> This has to be parsed from the sconscript files in the 0. phase.
+- Get(DEFINE_NAME) -> Return [None, value] it can return with the defined value, or with None, if the define is not exists. This has to be parsed from the sconsript in the phase 1.
+
+
+
 
 
 https://www.ostricher.com/2014/09/scons-multi-module-with-build-dir/
