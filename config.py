@@ -1,28 +1,15 @@
-import yaml
 import os
 import sys
-import exceptions
+from   SCons.Script import *
 
-default_config = \
-"""
----
-user_variants:
-  debug:
-    env_override: {}
-    env_extension: {}
-  release:
-    env_override: {}
-    env_extension: {}
-default_variants:
-- debug
-- release
-platforms: []
-automatic_module_discovery:
-  enable: true
-  scan_depth: 7
-  skip_patterns: []
-modules_list: []
-"""
+default_config = {'automatic_module_discovery': {'enable': True,
+                                'scan_depth': 7,
+                                'skip_patterns': []},
+ 'default_variants': ['debug', 'release'],
+ 'modules_list': [],
+ 'platforms': [],
+ 'user_variants': {'debug': {'env_extension': {}, 'env_override': {}},
+                   'release': {'env_extension': {}, 'env_override': {}}}}
 
 
 def merge(a, b, path=None):
@@ -48,26 +35,53 @@ def merge_two_dicts(x, y):
     #return z
 
 
+
+def _openYamlConfig(file):
+    try:
+        import yaml
+    except ImportError:
+        raise
+    else:
+        try:
+            with open(file, 'r') as stream:
+                data_loaded = yaml.load(stream)
+        except Exception as yaml_error:
+            raise yaml_error
+        else:
+            return data_loaded
+
+def _openJsonConfig(file):
+    try:
+        import json
+    except ImportError:
+        raise
+    else:
+        try:
+            with open(file, 'r') as stream:
+                data_loaded = json.load(stream)
+        except Exception as json_error:
+            raise json_error
+        else:
+            return data_loaded
+
+
 def _openConfiguration(file_with_path=None):
     if file_with_path:
         norm_path = os.path.normpath(file_with_path)
         extension = os.path.splitext(norm_path)[1]
-        if not (extension == ".yaml" or extension == ".yml"):
-            raise RuntimeError ("File type: %s is not a YAML file" % (norm_path))
-            pass
+        accepted_extensions = ['.yaml', '.yml', '.json']
+
+        if extension not in accepted_extensions:
+            raise RuntimeError ("File type: %s is not a YAML or JSON file" % (norm_path))
         else:
-            try:
-                with open(norm_path, 'r') as stream:
-                    data_loaded = yaml.load(stream)
-            #except (yaml.YAMLError, FileNotFoundError) as yaml_error:
-            except Exception as yaml_error:
-                raise yaml_error
+            if extension == '.json':
+                data_loaded = _openJsonConfig(norm_path)
+            else:
+                data_loaded = _openYamlConfig(norm_path)
     else:
-        try:
-            data_loaded = yaml.load(default_config)
-        except yaml.YAMLError as yaml_error:
-            raise yaml_error
+        data_loaded = default_config.copy()
     return data_loaded
+
 
 class BuildConfig(object):
     def __init__(self, user_config_file = ""):
@@ -84,14 +98,12 @@ class BuildConfig(object):
             try:
                 user_config = _openConfiguration(user_config_file)
             except Exception as y_error:
-                msg = "Configuration file \'%s\' cannot be loaded. Error: " % (user_config_file, y_error)
+                msg = "Configuration file \'%s\' cannot be loaded. Error: %s" % (user_config_file, y_error)
                 Exit(msg)
         #print ("def_config: ", def_config)
         #print ("user_config: ", user_config)
         # Overwrite the default values defined in the user config
         print("Default dict: \n", def_config)
-        import pydevd
-        pydevd.settrace()
         self._config = merge_two_dicts(def_config, user_config)
         print("Merged dict: \n", self._config)
 
