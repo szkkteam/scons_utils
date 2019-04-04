@@ -8,6 +8,8 @@ import platform
 import re
 from   SCons.Script import *
 from utils import AppendEnviroment
+from config import *
+import copy
 
 project_version = '0.1.0'
 
@@ -77,7 +79,6 @@ def _targets(target_list):
         yield target
 """
 def _variants(variant_list):
-    variant_list = variant_list.keys()
     for variant in variant_list:
         # Skip "hidden" records
         yield variant
@@ -87,19 +88,19 @@ def _variants(variant_list):
 ######################################################################
 targets_support_cc = ['linux', 'windows']
 
-
 class QEnvironment(object):
-    def __init__(self, env=None, variant_list=None):
+    def __init__(self, config_file=None, env=None):
         # Load an already created environment or create a default
         if env:
             self._env = env
         else:
             self._env = QEnvironment.GetDefaultEnvironment(self.InitializeCommandLineOptions())
 
-        variants_list = BASE_VARIANTS_ENV_EXTENSIONS
-        if variant_list:
-            variants_list.update(variant_list)
-            # Load the targets in to the environment
+        self._config_file = config_file
+        self._config = BuildConfig(config_file)
+
+        variants_list = self._config.GetVariantNames()
+        # Load the targets in to the environment
         self._getCommandLineVariants(variants_list)
 
         self._variants_list = variants_list
@@ -182,14 +183,16 @@ class QEnvironment(object):
         return target_arch
 
     def Clone(self):
-        return QEnvironment(self.env.Clone(), self._variants_list)
+        return QEnvironment(self._config_file, self.env.Clone())
 
     def ApplyVariant(self, variant):
         # TODO: Seperate override and extensions
         if variant in self._active_variants:
             # Store the selected variant in the environment
             self.env['VARIANT'] = variant
-            self.env.Append(**self._variants_list[variant])
+
+            self.env.Replace(**self._config.GetVariantOverride(variant))
+            self.env.Append(**self._config.GetVariantExtension(variant))
 
             # Setup the build directory
             self.env.SetDir(self.env.GetLaunchDir())
