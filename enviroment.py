@@ -7,7 +7,7 @@ import sys
 import platform
 import re
 from   SCons.Script import *
-from utils import AppendEnviroment
+from utils import AppendEnviroment, listify, intersection
 from config import *
 import copy
 
@@ -31,53 +31,6 @@ os_arch_map = {
 }
 
 
-BASE_VARIANTS_ENV_EXTENSIONS = {
-    'debug': dict(
-        # Extra flags for debug builds
-    ),
-    'release': dict(
-        # Extra flags for release builds
-    ),
-}
-
-def listify(args):
-    """Return args as a list.
-    If already a list - returned as is.
-    If a single instance of something that isn't a list, return it in a list.
-    If "empty" (None or whatever), return a zero-length list ([]).
-    """
-    if args:
-        if isinstance(args, list):
-            return args
-        return [args]
-    return []
-
-def remove_redundant(args):
-    args = listify(args)
-    if len(args) != len(set(args)):
-        # error_inconsistent_module_list
-        args = list(set(args))  # silently remove redundant items
-    return args
-
-def intersection(*args):
-    """Return the intersection of all iterables passed."""
-    args = list(args)
-    result = set(listify(args.pop(0)))
-    while args and result:
-        # Finish the loop either when args is consumed, or result is empty
-        result.intersection_update(listify(args.pop(0)))
-    return result
-
-"""
-def _targets(target_list):
-    if target_list:
-        target_lists = set(BASE_TARGET_ENV_EXTENSIONS.keys() + target_list.keys())
-    else:
-        target_lists = set(BASE_TARGET_ENV_EXTENSIONS.keys())
-    for target in target_lists:
-        # Skip "hidden" records
-        yield target
-"""
 def _variants(variant_list):
     for variant in variant_list:
         # Skip "hidden" records

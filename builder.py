@@ -10,7 +10,8 @@ from collections import defaultdict
 #import SCons
 from   SCons.Script import *
 import re
-from enviroment import QEnvironment, listify, remove_redundant
+from enviroment import QEnvironment
+from utils import remove_redundant, listify
 
 print("Processing using SCons version " + SCons.__version__)
 print('Python '+ sys.version.replace('\n','') + ' on '+sys.platform)

@@ -5,6 +5,34 @@ import re
 from   SCons.Script import *
 #from enviroment import GetTargetOs, GetTargetArch
 
+def listify(args):
+    """Return args as a list.
+    If already a list - returned as is.
+    If a single instance of something that isn't a list, return it in a list.
+    If "empty" (None or whatever), return a zero-length list ([]).
+    """
+    if args:
+        if isinstance(args, list):
+            return args
+        return [args]
+    return []
+
+def remove_redundant(args):
+    #if len(args) != len(set(args)):
+        # error_inconsistent_module_list
+        #args = list(set(args))  # silently remove redundant items
+    #return args
+    return list(set(args))  # silently remove redundant items
+
+def intersection(*args):
+    """Return the intersection of all iterables passed."""
+    args = list(args)
+    result = set(listify(args.pop(0)))
+    while args and result:
+        # Finish the loop either when args is consumed, or result is empty
+        result.intersection_update(listify(args.pop(0)))
+    return result
+
 ######################################################################
 # Convenience functions to "extend" SCons
 ######################################################################

@@ -1,6 +1,8 @@
 import os
 import sys
-from   SCons.Script import *
+import copy
+from SCons.Script import *
+from utils import remove_redundant, listify
 
 default_config = {'automatic_module_discovery': {'enable': True,
                                 'scan_depth': 7,
@@ -11,6 +13,53 @@ default_config = {'automatic_module_discovery': {'enable': True,
  'user_variants': {'debug': {'env_extension': {}, 'env_override': {}},
                    'release': {'env_extension': {}, 'env_override': {}}}}
 
+
+def data_merge(a, b):
+    """merges b into a and return merged result
+
+    NOTE: tuples and arbitrary objects are not handled as it is totally ambiguous what should happen"""
+    key = None
+    # ## debug output
+    # sys.stderr.write("DEBUG: %s to %s\n" %(b,a))
+    try:
+        if a is None or isinstance(a, str) or isinstance(a, unicode) or isinstance(a, int) or isinstance(a, long) or isinstance(a, float):
+            # border case for first run or if a is a primitive
+            a = b
+        elif isinstance(a, list):
+            # lists can be only appended
+            if isinstance(b, list):
+                # merge lists
+                print("List A: ", a)
+                print("List B: ", b)
+                a.extend(b)
+                if a != None:
+                    a = remove_redundant(a)
+                #a.extend(b)
+                print("Extend list: ", a)
+            else:
+                # append to list
+                print("List A: ", a)
+                print("List B: ", b)
+                a.append(b)
+                if a != None:
+                    a = remove_redundant(a)
+                #a.append(b)
+                print("Append list: ", a)
+        elif isinstance(a, dict):
+            # dicts must be merged
+            if isinstance(b, dict):
+                for key in b:
+                    if key in a:
+                        a[key] = data_merge(a[key], b[key])
+                    else:
+                        a[key] = b[key]
+            else:
+                print('Cannot merge non-dict "%s" into dict "%s"' % (b, a))
+        else:
+            print('NOT IMPLEMENTED "%s" into "%s"' % (b, a))
+    except TypeError, e:
+        print('TypeError "%s" in key "%s" when merging "%s" into "%s"' % (e, key, b, a))
+    return a
 
 def merge(a, b, path=None):
     "merges b into a"
@@ -29,10 +78,9 @@ def merge(a, b, path=None):
 
 # Support function for python version < 3.5
 def merge_two_dicts(x, y):
-    return merge(x,y)
+    return data_merge(x,y)
     #z = x.copy()   # start with x's keys and values
-    #z.update(y)    # modifies z with y's keys and values & returns None
-    #return z
+    #return data_merge(z, y)    # modifies z with y's keys and values & returns None
 
 
 
@@ -79,7 +127,7 @@ def _openConfiguration(file_with_path=None):
             else:
                 data_loaded = _openYamlConfig(norm_path)
     else:
-        data_loaded = default_config.copy()
+        data_loaded = copy.deepcopy(default_config)
     return data_loaded
 
 
