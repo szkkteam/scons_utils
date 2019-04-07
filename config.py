@@ -3,13 +3,20 @@ import sys
 import copy
 from SCons.Script import *
 from utils import remove_redundant, listify
+from classes import ExternalLibrary
 
-default_config = {'automatic_module_discovery': {'enable': True,
-                                'scan_depth': 7,
+default_config = {'automatic_module_discovery': { 'scan_depth': 7,
                                 'skip_patterns': []},
  'default_variants': ['debug', 'release'],
+ 'external_libs': {},
  'modules_list': [],
- 'platforms': [],
+ 'platforms': {'linux': {'arch': ['x86', 'x86_64', 'arm', 'armv7l', 'arm-v7a', 'armeabi-v7a', 'arm64', 'mips', 'mipsel',
+                                  'mips64', 'mips64el', 'i386', 'powerpc', 'sparc', 'aarch64', 'armv6l', 'armv7l'],
+                         'config': '/platforms/linux/SConscript',
+                         'hosts': ['linux']},
+               'windows': {'arch': ['x86', 'amd64', 'arm'],
+                         'config': '/platforms/windows/SConscript',
+                         'hosts': ['windows']}},
  'user_variants': {'debug': {'env_extension': {}, 'env_override': {}},
                    'release': {'env_extension': {}, 'env_override': {}}}}
 
@@ -22,29 +29,21 @@ def data_merge(a, b):
     # ## debug output
     # sys.stderr.write("DEBUG: %s to %s\n" %(b,a))
     try:
-        if a is None or isinstance(a, str) or isinstance(a, unicode) or isinstance(a, int) or isinstance(a, long) or isinstance(a, float):
+        if a is None or isinstance(a, str) or isinstance(a, int) or isinstance(a, float):
             # border case for first run or if a is a primitive
             a = b
         elif isinstance(a, list):
             # lists can be only appended
             if isinstance(b, list):
                 # merge lists
-                print("List A: ", a)
-                print("List B: ", b)
                 a.extend(b)
                 if a != None:
                     a = remove_redundant(a)
-                #a.extend(b)
-                print("Extend list: ", a)
             else:
                 # append to list
-                print("List A: ", a)
-                print("List B: ", b)
                 a.append(b)
                 if a != None:
                     a = remove_redundant(a)
-                #a.append(b)
-                print("Append list: ", a)
         elif isinstance(a, dict):
             # dicts must be merged
             if isinstance(b, dict):
@@ -57,7 +56,7 @@ def data_merge(a, b):
                 print('Cannot merge non-dict "%s" into dict "%s"' % (b, a))
         else:
             print('NOT IMPLEMENTED "%s" into "%s"' % (b, a))
-    except TypeError, e:
+    except TypeError as e:
         print('TypeError "%s" in key "%s" when merging "%s" into "%s"' % (e, key, b, a))
     return a
 
@@ -151,9 +150,10 @@ class BuildConfig(object):
         #print ("def_config: ", def_config)
         #print ("user_config: ", user_config)
         # Overwrite the default values defined in the user config
-        print("Default dict: \n", def_config)
+        #print("Default dict: \n", def_config)
+        #TODO: Valide the user config file.
         self._config = merge_two_dicts(def_config, user_config)
-        print("Merged dict: \n", self._config)
+        #print("Merged dict: \n", self._config)
 
     def GetVariantNames(self):
         return list(self._config['user_variants'].keys())
@@ -170,23 +170,35 @@ class BuildConfig(object):
     def GetVariantExtension(self, variant_name):
         return self._getVariantEnv(variant_name, 'env_extension')
 
-    def GetPlatformsDict(self):
+    def GetPlatforms(self):
         if 'platforms' in self._config:
-            return self._config['platforms']
+            return list(self._config['platforms'].keys())
         else:
             return list()
+
+    def GetArchitectures(self, target_os):
+        if 'platforms' in self._config:
+            if target_os in self._config['platforms'] and 'arch' in self._config['platforms'][target_os]:
+                return self._config['platforms'][target_os]['arch']
+        return list()
+
+    def GetPlatformConfig(self, target_os):
+        if 'platforms' in self._config:
+            if target_os in self._config['platforms'] and 'config' in self._config['platforms'][target_os]:
+                return self._config['platforms'][target_os]['config']
+        return ""
+
+    def GetHosts(self, target_os):
+        if 'platforms' in self._config:
+            if target_os in self._config['platforms'] and 'hosts' in self._config['platforms'][target_os]:
+                return self._config['platforms'][target_os]['hosts']
+        return list()
 
     def GetModulesList(self):
         if 'modules_list' in self._config:
             return self._config['modules_list']
         else:
             return list()
-
-    def IsAutomaticScanUsed(self):
-        if len (self.GetModulesList()) == 0:
-            if 'automatic_module_discovery' in self._config and 'enable' in self._config['automatic_module_discovery']:
-                return self._config['automatic_module_discovery']['enable']
-        return False
 
     def GetAutomaticScanDepth(self):
         if 'automatic_module_discovery' in self._config and 'scan_depth' in self._config['automatic_module_discovery']:
@@ -197,3 +209,15 @@ class BuildConfig(object):
         if 'automatic_module_discovery' in self._config and 'skip_patterns' in self._config['automatic_module_discovery']:
             return self._config['automatic_module_discovery']['skip_patterns']
         return list()
+
+    def GetExternalLibraries(self):
+        return list(self._config['external_libs'].keys())
+
+    def GetExternalLib(self, lib_name):
+        if 'external_libs' in self._config:
+            if lib_name in self._config['external_libs']:
+                libs = self._config['external_libs'][lib_name]['libs']
+                include_paths = self._config['external_libs'][lib_name]['include_paths']
+                lib_paths = self._config['external_libs'][lib_name]['lib_paths']
+                return ExternalLibrary(lib_name, libs, include_paths, lib_paths)
+        return None

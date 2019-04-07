@@ -9,32 +9,31 @@ import re
 from   SCons.Script import *
 from utils import AppendEnviroment, listify, intersection
 from config import *
-import copy
+#import copy
 
 project_version = '0.1.0'
-
-# Map of build host to possible target os
-host_target_map = {
-    'linux': ['linux'],
-    'windows': ['windows']
-    #TODO: support more pre-build target.
-}
-
-# Map of target os to possible target architecture
-os_arch_map = {
-    'linux': [
-        'x86', 'x86_64', 'arm', 'armv7l', 'arm-v7a', 'armeabi-v7a', 'arm64', 'mips',
-        'mipsel', 'mips64', 'mips64el', 'i386', 'powerpc', 'sparc', 'aarch64',
-        'armv6l', 'armv7l'
-    ],
-    'windows': ['x86', 'amd64', 'arm']
-}
 
 
 def _variants(variant_list):
     for variant in variant_list:
         # Skip "hidden" records
         yield variant
+
+
+def GetHost():
+    # Fetch host from Python platform information and smash case
+    return platform.system().lower()
+
+def GetDefaultArch(target_os):
+    # work out a reasonable default for target_arch if not specified by user
+    return  platform.machine()
+
+def GetTargetOs():
+    host = GetHost()
+    return ARGUMENTS.get('TARGET_OS', host).lower()
+
+def GetTargetArch(target_os):
+    return ARGUMENTS.get('TARGET_ARCH', GetDefaultArch(target_os))  # target arch
 
 ######################################################################
 # Platform (build target) specific options: SDK/NDK & toolchain
@@ -43,14 +42,15 @@ targets_support_cc = ['linux', 'windows']
 
 class QEnvironment(object):
     def __init__(self, config_file=None, env=None):
+        # Load the configuration paramters.
+        self._config_file = config_file
+        self._config = BuildConfig(config_file)
+
         # Load an already created environment or create a default
         if env:
             self._env = env
         else:
             self._env = QEnvironment.GetDefaultEnvironment(self.InitializeCommandLineOptions())
-
-        self._config_file = config_file
-        self._config = BuildConfig(config_file)
 
         variants_list = self._config.GetVariantNames()
         # Load the targets in to the environment
@@ -92,54 +92,59 @@ class QEnvironment(object):
     def env(self):
         return self._env
 
-    @staticmethod
-    def GetHost():
+    def _getHost(self):
         # Fetch host from Python platform information and smash case
-        host = platform.system().lower()
+        host = GetHost()
 
-        if host not in host_target_map:
+        # Get all the hosts
+        host_found = False
+        for os in self._config.GetPlatforms():
+            if host in self._config.GetHosts(os):
+                host_found = True
+
+        if not host_found:
             msg = "\nError: building on host os '%s' is not currently supported.\n" % host
             Exit(msg)
         return host
 
-    @staticmethod
-    def GetDefaultArch(target_os):
+    def _getDefaultArch(self, target_os):
         # work out a reasonable default for target_arch if not specified by user
-        default_arch = platform.machine()
+        default_arch = GetDefaultArch(target_os)
         if target_os == 'windows':
             default_arch = default_arch.lower()
-        if target_os == 'linux' and default_arch in os_arch_map[target_os]:
+        if target_os == 'linux' and default_arch in self._config.GetArchitectures(target_os):
             default_arch = default_arch.lower()
 
         return default_arch
 
-    @staticmethod
-    def GetTargetOs():
-        host = QEnvironment.GetHost()
-        target_os = ARGUMENTS.get('TARGET_OS', host).lower()
+    def _getTargetOs(self):
+        host = self._getHost()
+        target_os = GetTargetOs()
+        host_target_map = self._config.GetHosts(target_os)
 
-        if target_os not in host_target_map[host]:
+        if host not in host_target_map :
             msg = "\nError: host '%s' cannot currently build target '%s'" % (host, target_os)
-            msg += "\n\tchoices: %s\n" % host_target_map[host]
+            msg += "\n\tchoices: %s\n" % host_target_map
             Exit(msg)
 
         return target_os
 
-    @staticmethod
-    def GetTargetArch(target_os):
-        target_arch = ARGUMENTS.get('TARGET_ARCH', QEnvironment.GetDefaultArch(target_os))  # target arch
-        if target_arch not in os_arch_map[target_os]:
+    def _getTargetArch(self, target_os):
+        target_arch = GetTargetArch(target_os)
+        os_arch_map = self._config.GetArchitectures(target_os)
+
+        if target_arch not in os_arch_map:
             msg = "\nError: target os '%s' cannot currently build target '%s'" % (target_os, target_arch)
-            msg += "\n\tchoices: %s\n" % os_arch_map[target_os]
+            msg += "\n\tchoices: %s\n" % os_arch_map
             Exit(msg)
 
         return target_arch
 
     def Clone(self):
+        # TODO: Perform a normal copy operation, not re-initialize the class. Or avoid the double initialization
         return QEnvironment(self._config_file, self.env.Clone())
 
     def ApplyVariant(self, variant):
-        # TODO: Seperate override and extensions
         if variant in self._active_variants:
             # Store the selected variant in the environment
             self.env['VARIANT'] = variant
@@ -149,12 +154,6 @@ class QEnvironment(object):
 
             # Setup the build directory
             self.env.SetDir(self.env.GetLaunchDir())
-
-            # If the variant target is still present in the build targets, add as an alias
-            #if variant in BUILD_TARGETS:
-                # Create an alias for the target
-                # TODO: This shall be placed to builder.py where the prog is built.
-                #self.env.Alias(variant, self.env['BUILD_DIR'])
 
         else:
             msg = "\nError: variant '%s' not specified." % (variant)
@@ -167,15 +166,15 @@ class QEnvironment(object):
     ######################################################################
     def InitializeCommandLineOptions(self):
 
-        host = QEnvironment.GetHost()
+        host = self._getHost()
 
-        target_os = QEnvironment.GetTargetOs()
+        target_os = self._getTargetOs()
 
         # generate a list of unique targets: convert to set() for uniqueness,
         # then convert back to a list
-        targetlist = list(set(x for l in list(host_target_map.values()) for x in l))
+        targetlist = self._config.GetPlatforms()
 
-        default_arch = QEnvironment.GetDefaultArch(target_os)
+        default_arch = self._getDefaultArch(target_os)
 
         if ARGUMENTS.get('RUN_TEST') == 'ON':
             logging_default = False
@@ -194,7 +193,7 @@ class QEnvironment(object):
                          project_version),
             EnumVariable('VERBOSE',
                          'Show compilation. Format: 0=minimal, 1=full, 2=debug',
-                         default='ON',
+                         default='OFF',
                          allowed_values=('OFF', 'ON', 'DEBUG')),
             BoolVariable('RELEASE',
                          'Build for release?',
@@ -210,7 +209,7 @@ class QEnvironment(object):
             EnumVariable('TARGET_ARCH',
                          'Target architecture',
                          default=default_arch,
-                         allowed_values=os_arch_map[target_os]),
+                         allowed_values=self._config.GetArchitectures(target_os)),
             EnumVariable('RUN_TEST',
                          'Run unit tests',
                          default='ON',
@@ -278,8 +277,8 @@ class QEnvironment(object):
 ######################################################################
     @staticmethod
     def GetDefaultEnvironment(help_vars):
-        target_os = QEnvironment.GetTargetOs()
-        target_arch = QEnvironment.GetTargetArch(target_os)
+        target_os = GetTargetOs()
+        target_arch = GetTargetArch(target_os)
         env = Environment(
             variables=help_vars,
             tools=['default', 'textfile'],
@@ -314,7 +313,7 @@ class QEnvironment(object):
                 print("using LDFLAGS/LINKFLAGS from environment: %s" % env['LINKFLAGS'])
 
         # set quieter build messages unless verbose mode was requested
-        if env.get('VERBOSE') == 'ON':
+        if env.get('VERBOSE') == 'OFF':
             env['CCCOMSTR'] = "Compiling: $TARGET"
             env['SHCCCOMSTR'] = "Compiling: $TARGET"
             env['CXXCOMSTR'] = "Compiling: $TARGET"
@@ -432,10 +431,18 @@ class QEnvironment(object):
 
         return env
 
-    def GetPlatformConfig(self, path_to_config = ""):
-        # Load config of target os
-        env = self.env
-        if path_to_config:
-            self.env.SConscript(path_to_config, must_exist=1, exports=['env'])
-        else:
-            self.env.SConscript(GetOption('site_dir') + '/platforms/' + QEnvironment.GetTargetOs() + '/SConscript', must_exist=1, exports=['env'])
+    def GetPlatformConfig(self):
+        search_dir = [self.env.GetLaunchDir(), GetOption('site_dir')]
+        target_os = self._getTargetOs()
+        config_file = self._config.GetPlatformConfig(target_os)
+
+        for base_dir in search_dir:
+            path = os.path.normpath(base_dir + config_file)
+            #path = os.path.join(base_dir, config_file)
+            if os.path.exists(path):
+                # Load config of target os
+                print ("Loading configuration file \'%s\'." % path)
+                env = self.env
+                self.env.SConscript(path, must_exist=1, exports=['env'])
+                break
+

@@ -11,33 +11,44 @@ from collections import defaultdict
 from   SCons.Script import *
 import re
 from enviroment import QEnvironment
-from utils import remove_redundant, listify
+from utils import remove_redundant, listify, path_to_key, nop, module_dirs_generator
+from classes import ExternalLibrary, LibraryList, InternalLibrary
 
 print("Processing using SCons version " + SCons.__version__)
 print('Python '+ sys.version.replace('\n','') + ' on '+sys.platform)
 #TODO: Enable this when neccessery to force the version
 #assert sys.version_info >= (3, 5)
 
-def modules():
-    """Generate modules to build.
-    Each module is a directory with a SConscript file.
-    Modules must be yielded in order of dependence,
-     such that modules[i] does not depend on modules[j] for every i<j.
-    """
-    yield 'driver2'
-    yield 'driver'
-    yield 'app'
-    yield 'example'
 
-def nop(*args, **kwargs):  # pylint: disable=unused-argument
-    """Take arbitrary args and kwargs and do absolutely nothing!"""
-    pass
+# List of cached modules to save processing for second call and beyond
+_CACHED_MODULES = list()
 
-def path_to_key(path):
-    """Convert path to `key`, by replacing pathseps with periods."""
-    return path.replace('/', '.').replace('\\', '.')
+def scan_modules(modules_list, max_depth, file_skip_list):
+    _CACHED_MODULES = listify(modules_list)
 
+    def modules():
+        """Generate modules to build.
+        Each module is a directory with a SConscript file.
+        """
+        if not _CACHED_MODULES:
+            # Build the cache
+            def build_dir_skipper(dirpath):
+                """Return True if `dirpath` is the build base dir."""
+                return os.path.normpath('out') == os.path.normpath(dirpath)
+            def hidden_dir_skipper(dirpath):
+                """Return True if `dirpath` last dir component begins with '.'"""
+                last_dir = os.path.basename(dirpath)
+                return last_dir.startswith('.')
+            for module_path in module_dirs_generator(
+                    max_depth=max_depth, followlinks=False,
+                    dir_skip_list=[build_dir_skipper, hidden_dir_skipper],
+                    file_skip_list=file_skip_list):
+                _CACHED_MODULES.append(module_path)
+        # Yield modules from cache
+        for module in _CACHED_MODULES:
+            yield module
 
+    return modules
 
 class ProjectBuilder(object):
     def __init__(self, env=None):
@@ -48,6 +59,12 @@ class ProjectBuilder(object):
         else:
             self._env = QEnvironment()
 
+        scan_depth = self._env._config.GetAutomaticScanDepth()
+        skip_keyword = self._env._config.GetAutomaticScanKeyword()
+        module_list = self._env._config.GetModulesList()
+
+        self._modules = scan_modules(module_list, scan_depth, skip_keyword)
+
 
     def Build(self, target=None):
         if not target:
@@ -56,7 +73,7 @@ class ProjectBuilder(object):
         else:
             # Create construction env clone for flavor customizations
             target_build = _targetBuilder(self._env, target)
-            target_build.Build()
+            target_build.Build(self._modules)
 
 
 
@@ -79,7 +96,8 @@ class _targetBuilder(object):
     def __init__(self, env, target):
         print ("scons: Processing variant: \'%s\'..." % (target))
         # Initialize shared libraries dictionary
-        self._shared_libs = dict()
+        self._shared_libs = LibraryList()
+
         # Install headers dictionary
         self._shared_headers = defaultdict(list)
         # Initialize programs dictionary
@@ -93,7 +111,10 @@ class _targetBuilder(object):
 
         self._target = target
 
-
+        # Load the external libraries
+        for lib in self._env._config.GetExternalLibraries():
+            ext_lib = self._env._config.GetExternalLib(lib)
+            self._shared_libs.add(ext_lib._name, ext_lib)
 
     ##
     # Creates a path out of given elements, which are substituted if needed.
@@ -154,12 +175,12 @@ class _targetBuilder(object):
 
     def first_pass_dict(self, module):
         _default_shortcuts = dict(
-            CreateDefaultTargetLib=lambda name=module, version='0.1', sources=list(), headers=list(), *args,
+            CreateDefaultTargetLib=lambda name=module, version='0.1', sources=list(), headers=list(), libs=list(), *args,
             **kwargs: self._build_alias_lib(
-                module, name, module, version, sources, headers, *args, **kwargs),
-            CreateTargetLib=lambda target=self._target, name=module, version='0.1', sources=list(), headers=list(),
+                module, name, module, version, sources, headers, libs, *args, **kwargs),
+            CreateTargetLib=lambda target=self._target, name=module, version='0.1', sources=list(), headers=list(), libs=list(),
             *args, **kwargs: self._build_alias_lib(
-                target, name, module, version, sources, headers, *args, **kwargs),
+                target, name, module, version, sources, headers, libs, *args, **kwargs),
             CreateDefaultTargetExecutable=nop,
             CreateTargetExecutable=nop
         )
@@ -178,7 +199,7 @@ class _targetBuilder(object):
         )
         return _default_shortcuts
 
-    def Build(self):
+    def Build(self, modules):
         """Build flavor using two-pass strategy."""
         # First pass over all modules - process and collect library targets
         for module in modules():
@@ -212,33 +233,6 @@ class _targetBuilder(object):
                 #print("Target: %s - Alias: %s - Node: %s" % (self._target, alias, node))
                 self.env.Alias(alias, node)
 
-    def _build_alias_lib(self, alias, lib_name, module_name, module_version,  sources, headers, *args, **kwargs):
-        # Create unique library key from module and library name
-        # TODO: Append the module version to the key, modifiy the querry to be able to search for specific version, or latest version (dont care version)
-        lib_key = self.lib_key(module_name, lib_name)
-        assert lib_key not in self._shared_libs
-        # Store resulting library node in shared dictionary
-        # self._shared_libs[lib_key] = bldr_func(lib_name, sources, *args, **kwargs)
-        obj_targets = self._build_default_objects(module_name, sources)
-        # Create a lib node.
-        lib_node = self.env.Library(target=lib_name, source=obj_targets, *args, **kwargs)
-        # Store the library key in shared libs list
-        self._shared_libs[lib_key] = lib_node
-        # Create an alias target for the lib
-        self.createAlias(alias, lib_node)
-        # Make sure headers are list
-        headers = listify(headers)
-        if len(headers) > 0:
-            # Remove redundant elements
-            headers = remove_redundant(headers)
-            # Get the isntall directory for the active variant
-            inc_path = self.env['INC_DIR'] + '/'
-            # Install every header file to the shared <INC_DIR> keep the folder hierarchy for the header files
-            inc_node = [self.env.Install(self.createNode([os.path.split(inc_path + h)[0]]), h) for h in headers]
-            # Create alias targets for the header nodes
-            self.createAlias(alias, inc_node)
-            self.createAlias('install', inc_node)
-
     def _build_default_objects(self, module, sources):
         # Make sure headers are list
         sources = listify(sources)
@@ -266,50 +260,69 @@ class _targetBuilder(object):
                 self.createAlias(module + '/' + item, obj_node)
         return obj_targets
 
+    def _build_alias_lib(self, alias, lib_name, module_name, module_version,  sources, headers, libs, *args, **kwargs):
+        # Create unique library key from module and library name
+        # TODO: Append the module version to the key, modifiy the querry to be able to search for specific version, or latest version (dont care version)
+        # Store resulting library node in shared dictionary
+        # self._shared_libs[lib_key] = bldr_func(lib_name, sources, *args, **kwargs)
+        obj_targets = self._build_default_objects(module_name, sources)
+        # Create a lib node.
+        lib_node = self.env.Library(target=lib_name, source=obj_targets, *args, **kwargs)
+        # Store the library key in shared libs list
+        key = LibraryList.CreateLibraryKey(module_name, lib_name)
+        self._shared_libs.add(key, InternalLibrary(lib_name, lib_node), libs)
+
+        # Create an alias target for the lib
+        self.createAlias(alias, lib_node)
+        # Make sure headers are list
+        headers = listify(headers)
+        if len(headers) > 0:
+            # Remove redundant elements
+            headers = remove_redundant(headers)
+            # Get the isntall directory for the active variant
+            inc_path = self.env['INC_DIR'] + '/'
+            # Install every header file to the shared <INC_DIR> keep the folder hierarchy for the header files
+            inc_node = [self.env.Install(self.createNode([os.path.split(inc_path + h)[0]]), h) for h in headers]
+            # Create alias targets for the header nodes
+            self.createAlias(alias, inc_node)
+            self.createAlias('install', inc_node)
+
     def _build_alias_executable(self, alias, prog_name, module_name, prog_version, sources, link_libs, *args, **kwargs):
         lib_nodes = []
-        for lib_name in listify(link_libs):
-            lib_keys = listify(self._get_matching_lib_keys(lib_name))
-            if len(lib_keys) == 1:
-                # Matched internal library
-                lib_key = lib_keys[0]
-                # Extend prog sources with library nodes
-                lib_nodes.extend(self._shared_libs[lib_key])
-            elif len(lib_keys) > 1:
-                # Matched multiple internal libraries - probably bad!
-                msg = "Library identifier \'%s\' matched %d libraries (%s). Please use a fully qualified identifier instead!" % (lib_name, len(lib_keys), ', '.join(lib_keys))
-                Exit(msg)
-            else:  # empty lib_keys
+        # Get lbirary dependencies
+        cpp_paths = listify(kwargs.pop('CPPPATH', list()))
+        ext_libs = listify(kwargs.pop('LIBS', list()))
+        lib_paths = listify(kwargs.pop('LIBPATH', list()))
 
-                msg = "Library identifier \'%s\' didn\'t match any library. Is it a typo?" % (lib_name)
-                Exit(msg)
+        print ("link_libs: ", link_libs)
+        libs_dict = self._shared_libs.GetLibraries(link_libs)
+        print("libs_dict: ", libs_dict)
+
+
+        #kwargs['CPPPATH'] = cpp_paths.extend(libs_dict['CPPPATH'])
+        #kwargs['LIBS'] = ext_libs.extend(libs_dict['LIBS'])
+        #kwargs['LIBPATH'] = lib_paths.extend(libs_dict['LIBPATH'])
+
+        #print("CPPPATH:", kwargs['CPPPATH'])
+        #print("lib.ext_libs:", kwargs['LIBS'])
+        #print("LIBPATH:", kwargs['LIBPATH'])
+
+        """
+        if cpp_paths:
+            kwargs['CPPPATH'] = [lib.cpp_paths for lib  in lib_nodes]
+        if ext_libs:
+            kwargs['LIBS'] = [lib.ext_libs for lib  in lib_nodes]
+        if lib_paths:
+            kwargs['LIBPATH'] = [lib.lib_paths for lib  in lib_nodes]
+        """
+
         exec_path = self.env['BUILD_DIR'] + '/'
         obj_nodes = (self._build_default_objects(module_name, sources))
-        prog_nodes = self.env.Program(exec_path + prog_name, obj_nodes, LIBS=lib_nodes, *args, **kwargs)
+        prog_nodes = self.env.Program(exec_path + prog_name, obj_nodes,
+                                                 LIBS=ext_libs.extend(libs_dict['LIBS']), **kwargs)
         # Create an alias target for the lib
         #if self._target in BUILD_TARGETS:
         self.createAlias(alias, prog_nodes)
-
-
-        #obj_targets = self._build_default_objects(module_name, sources)
-
-
-    def _get_matching_lib_keys(self, lib_query):
-        """Return list of library keys for given library name query.
-        A "library query" is either a fully-qualified "Module::LibName" string
-         or just a "LibName".
-        If just "LibName" form, return all matches from all modules.
-        """
-        if self.is_lib_key(lib_query):
-            # It's a fully-qualified "Module::LibName" query
-            if lib_query in self._shared_libs:
-                # Got it. We're done.
-                return [lib_query]
-        else:
-            # It's a target-name-only query. Search for matching lib keys.
-            lib_key_suffix = '%s%s' % (self._key_sep, lib_query)
-            return [lib_key for lib_key in self._shared_libs
-                    if lib_key.endswith(lib_key_suffix)]
-
-
+        self.createAlias(module_name
+                         , prog_nodes)
 
