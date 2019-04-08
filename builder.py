@@ -173,7 +173,13 @@ class _targetBuilder(object):
     def createAlias(self, name, node):
         self._target_nodes[name].extend(node)
 
-    def first_pass_dict(self, module):
+    def _process_flags_shortcuts(self, module):
+        _default_shortcuts = dict(
+
+        )
+        return _default_shortcuts
+
+    def _process_libs_shortcuts(self, module):
         _default_shortcuts = dict(
             CreateDefaultTargetLib=lambda name=module, version='0.1', sources=list(), headers=list(), libs=list(), *args,
             **kwargs: self._build_alias_lib(
@@ -186,7 +192,7 @@ class _targetBuilder(object):
         )
         return _default_shortcuts
 
-    def second_pass_dict(self, module):
+    def _process_execs_shortcuts(self, module):
         _default_shortcuts = dict(
             CreateDefaultTargetLib=nop,
             CreateTargetLib=nop,
@@ -215,7 +221,7 @@ class _targetBuilder(object):
                 variant_dir=os.path.join(self.env['LIB_PATH'], module),
                 must_exist=1,
                 duplicate=0,
-                exports=self.first_pass_dict(module))
+                exports=self._process_libs_shortcuts(module))
         # Second pass over all modules - process program targets
         # Workaround to do not let the system to build the libs twice
         for module in modules():
@@ -225,7 +231,7 @@ class _targetBuilder(object):
                 variant_dir=os.path.join(self.env['BUILD_DIR'], module),
                 must_exist=1,
                 duplicate=0,
-                exports=self.second_pass_dict(module))
+                exports=self._process_execs_shortcuts(module))
 
         # Create aliases for each node
         for alias, nodes in self._target_nodes.items():
