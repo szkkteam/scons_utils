@@ -35,7 +35,6 @@ class ExternalLibrary(ILibrary):
         """
         super(ExternalLibrary, self).__init__(name)
         self._libs = listify(libs) if len(libs) else [name]
-        print ("ExternalLibrary self._libs: ", self._libs)
         self._cpp_paths = listify(include_paths)
         self._lib_paths = listify(lib_paths)
 
@@ -55,10 +54,7 @@ class LibraryList(object):
     def add(self,key, lib_obj, lib_deps=list()):
         assert key not in self._libs
         lib_deps = { 'lib_obj': lib_obj, 'lib_deps': listify(lib_deps) }
-        print("Add method: %s : values: %s" %  (key, lib_obj.GetLib()))
         self._libs[key] = lib_deps
-
-        print("self._libs: ", self._libs)
 
     @classmethod
     def CreateLibraryKey(cls, module, target_name):
@@ -77,20 +73,17 @@ class LibraryList(object):
         # Create an empty dictionary for the libs
         libs_dict = { 'CPPPATH' : list(), 'LIBS' : list(), 'LIBPATH' : list() }
         self._get_lib_depends(libs_dict, libs)
+
         return libs_dict
 
 
     def _get_lib_depends(self,lib_dict, lib_list):
         for lib_name in listify(lib_list):
-            print("lib_name:", lib_name)
             lib_keys = listify(self._get_matching_lib_keys(lib_name))
             if len(lib_keys) == 1:
                 # Matched internal library
                 lib_key = lib_keys[0]
-                # Extend prog sources with library nodes
-                #lib_nodes.extend(self._shared_libs[lib_key]['lib_node'])
                 # Search for the found library dependencies
-                print("lib_key['lib_obj'] : ", self._libs[lib_key]['lib_obj'])
                 libs, cpp_paths, lib_paths = self._libs[lib_key]['lib_obj'].GetLib()
                 lib_dict['CPPPATH'].extend(cpp_paths)
                 lib_dict['LIBS'].extend(libs)
@@ -114,8 +107,6 @@ class LibraryList(object):
         """
         if LibraryList.IsLibraryKey(lib_query):
             # It's a fully-qualified "Module::LibName" query
-            print ("lib_query :", lib_query )
-            print("self._libs :", self._libs)
             if lib_query in self._libs:
                 # Got it. We're done.
                 return [lib_query]

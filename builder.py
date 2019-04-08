@@ -261,15 +261,14 @@ class _targetBuilder(object):
         return obj_targets
 
     def _build_alias_lib(self, alias, lib_name, module_name, module_version,  sources, headers, libs, *args, **kwargs):
-        # Create unique library key from module and library name
         # TODO: Append the module version to the key, modifiy the querry to be able to search for specific version, or latest version (dont care version)
         # Store resulting library node in shared dictionary
-        # self._shared_libs[lib_key] = bldr_func(lib_name, sources, *args, **kwargs)
         obj_targets = self._build_default_objects(module_name, sources)
         # Create a lib node.
         lib_node = self.env.Library(target=lib_name, source=obj_targets, *args, **kwargs)
-        # Store the library key in shared libs list
+        # Create unique library key from module and library name
         key = LibraryList.CreateLibraryKey(module_name, lib_name)
+        # Store the library key in shared libs list
         self._shared_libs.add(key, InternalLibrary(lib_name, lib_node), libs)
 
         # Create an alias target for the lib
@@ -289,40 +288,29 @@ class _targetBuilder(object):
 
     def _build_alias_executable(self, alias, prog_name, module_name, prog_version, sources, link_libs, *args, **kwargs):
         lib_nodes = []
-        # Get lbirary dependencies
+        # Store the kwarg flags
         cpp_paths = listify(kwargs.pop('CPPPATH', list()))
         ext_libs = listify(kwargs.pop('LIBS', list()))
         lib_paths = listify(kwargs.pop('LIBPATH', list()))
 
-        print ("link_libs: ", link_libs)
+        # Get the dependencies for the executable
         libs_dict = self._shared_libs.GetLibraries(link_libs)
-        print("libs_dict: ", libs_dict)
 
+        # Extend the stored flags with the lib dependencies
+        cpp_paths.extend(libs_dict['CPPPATH'])
+        ext_libs.extend(libs_dict['LIBS'])
+        lib_paths.extend(libs_dict['LIBPATH'])
 
-        #kwargs['CPPPATH'] = cpp_paths.extend(libs_dict['CPPPATH'])
-        #kwargs['LIBS'] = ext_libs.extend(libs_dict['LIBS'])
-        #kwargs['LIBPATH'] = lib_paths.extend(libs_dict['LIBPATH'])
-
-        #print("CPPPATH:", kwargs['CPPPATH'])
-        #print("lib.ext_libs:", kwargs['LIBS'])
-        #print("LIBPATH:", kwargs['LIBPATH'])
-
-        """
-        if cpp_paths:
-            kwargs['CPPPATH'] = [lib.cpp_paths for lib  in lib_nodes]
-        if ext_libs:
-            kwargs['LIBS'] = [lib.ext_libs for lib  in lib_nodes]
-        if lib_paths:
-            kwargs['LIBPATH'] = [lib.lib_paths for lib  in lib_nodes]
-        """
+        # Copy back the dependencies to the kwargs
+        kwargs['CPPPATH'] = cpp_paths
+        kwargs['LIBS'] = ext_libs
+        kwargs['LIBPATH'] = lib_paths
 
         exec_path = self.env['BUILD_DIR'] + '/'
         obj_nodes = (self._build_default_objects(module_name, sources))
-        prog_nodes = self.env.Program(exec_path + prog_name, obj_nodes,
-                                                 LIBS=ext_libs.extend(libs_dict['LIBS']), **kwargs)
+        prog_nodes = self.env.Program(exec_path + prog_name, obj_nodes, **kwargs)
         # Create an alias target for the lib
         #if self._target in BUILD_TARGETS:
         self.createAlias(alias, prog_nodes)
-        self.createAlias(module_name
-                         , prog_nodes)
+        self.createAlias(module_name, prog_nodes)
 
